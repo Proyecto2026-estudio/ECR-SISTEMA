@@ -13,6 +13,101 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+// ============================================================
+//  AUTENTICACIÓN · Login, sesiones y recuperación simple
+// ============================================================
+const crypto = require('crypto');
+const APP_SECRET = process.env.APP_SECRET || 'cambiar-este-secreto-en-variables-de-railway';
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return salt + ':' + hash;
+}
+
+function verifyPassword(password, stored) {
+  const [salt, hash] = stored.split(':');
+  const hashIntento = crypto.scryptSync(password, salt, 64).toString('hex');
+  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(hashIntento, 'hex'));
+}
+
+function signToken(usuario) {
+  const payload = JSON.stringify({ id: usuario.id, rol: usuario.rol, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 });
+  const data = Buffer.from(payload).toString('base64url');
+  const firma = crypto.createHmac('sha256', APP_SECRET).update(data).digest('base64url');
+  return data + '.' + firma;
+}
+
+function verifyToken(token) {
+  try {
+    const [data, firma] = token.split('.');
+    const firmaEsperada = crypto.createHmac('sha256', APP_SECRET).update(data).digest('base64url');
+    if (firma !== firmaEsperada) return null;
+    const payload = JSON.parse(Buffer.from(data, 'base64url').toString());
+    if (payload.exp < Date.now()) return null;
+    return payload;
+  } catch (e) { return null; }
+}
+
+function requireAuth(req, res, next) {
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  const payload = token && verifyToken(token);
+  if (!payload) return res.status(401).json({ error: 'No autorizado, iniciá sesión de nuevo' });
+  req.usuario = payload;
+  next();
+}
+
+function requireAdmin(req, res, next) {
+  if (req.usuario.rol !== 'admin') return res.status(403).json({ error: 'Necesitás permisos de administrador' });
+  next();
+}
+
+app.post('/api/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Falta email o contraseña' });
+    const [rows] = await db.query('SELECT * FROM usuarios WHERE email = ?', [email]);
+    if (rows.length === 0) return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+    const usuario = rows[0];
+    const ok = verifyPassword(password, usuario.password_hash);
+    if (!ok) return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+    const token = signToken(usuario);
+    res.json({ token, usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol } });
+  } catch (e) { res.status(500).json({ error: 'Error de servidor' }); }
+});
+
+app.get('/api/me', requireAuth, async (req, res) => {
+  const [rows] = await db.query('SELECT id, nombre, email, rol FROM usuarios WHERE id = ?', [req.usuario.id]);
+  if (rows.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
+  res.json(rows[0]);
+});
+
+app.get('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
+  const [rows] = await db.query('SELECT id, nombre, email, rol, creado_en FROM usuarios ORDER BY id');
+  res.json(rows);
+});
+
+app.post('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { nombre, email, password, rol } = req.body;
+    if (!nombre || !email || !password) return res.status(400).json({ error: 'Faltan datos' });
+    const hash = hashPassword(password);
+    await db.query('INSERT INTO usuarios (nombre, email, password_hash, rol) VALUES (?,?,?,?)',
+      [nombre, email, hash, rol === 'admin' ? 'admin' : 'usuario']);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'No se pudo crear el usuario (¿email repetido?)' }); }
+});
+
+app.put('/api/usuarios/:id/password', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ error: 'Falta la contraseña nueva' });
+    const hash = hashPassword(password);
+    await db.query('UPDATE usuarios SET password_hash = ? WHERE id = ?', [hash, req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Error de servidor' }); }
+});
 
 
 // ══════════════════════════════════════════════════════════

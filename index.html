@@ -525,7 +525,7 @@
   const dleft = f => Math.ceil((new Date(f+'T00:00') - new Date().setHours(0,0,0,0))/864e5);
 
   // ── conexión con el backend (Railway) ──
-  const API_BASE = 'https://brilliant-perception-production-e57b.up.railway.app';
+  const API_BASE = ecr-sistema.up.railway.app';
   const DB = { clientes:[], venc:[], docs:[] };
   async function api(path, method, body){
     const opts = { method: method||'GET', headers:{} };

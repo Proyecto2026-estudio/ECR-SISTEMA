@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recuperar contraseña · ECR</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    font-family: system-ui, sans-serif; background: #16161a;
+  }
+  .card {
+    background: #fff; padding: 2.5rem; border-radius: 12px; width: 100%; max-width: 360px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+  h1 { font-size: 1.3rem; margin: 0 0 0.5rem; color: #16161a; text-align: center; }
+  p.sub { font-size: 0.85rem; color: #666; text-align: center; margin: 0 0 1.5rem; }
+  label { display: block; font-size: 0.85rem; margin-bottom: 0.3rem; color: #444; }
+  input {
+    width: 100%; padding: 0.7rem; margin-bottom: 1rem; border: 1px solid #e2ddd2;
+    border-radius: 6px; font-size: 1rem;
+  }
+  button {
+    width: 100%; padding: 0.8rem; background: #b08d3c; color: #fff; border: none;
+    border-radius: 6px; font-size: 1rem; cursor: pointer;
+  }
+  button:hover { opacity: 0.9; }
+  .error {
+    background: #fdecea; color: #c0392b; padding: 0.6rem; border-radius: 6px;
+    font-size: 0.85rem; margin-bottom: 1rem; display: none;
+  }
+  .ok {
+    background: #eafaf1; color: #1e8449; padding: 0.8rem; border-radius: 6px;
+    font-size: 0.9rem; margin-bottom: 1rem; display: none; text-align: center;
+  }
+  .ok strong { display: block; font-size: 1.2rem; margin-top: 0.4rem; letter-spacing: 1px; }
+  a.volver { display: block; text-align: center; margin-top: 1rem; font-size: 0.85rem; color: #666; text-decoration: none; }
+  a.volver:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Recuperar contraseña</h1>
+    <p class="sub">Ingresá tu email y te generamos una contraseña temporal.</p>
+    <div class="error" id="error"></div>
+    <div class="ok" id="ok">
+      Tu contraseña nueva es:
+      <strong id="nuevaPass"></strong>
+    </div>
+    <form id="recuperarForm">
+      <label for="email">Email</label>
+      <input type="email" id="email" required>
+      <button type="submit">Generar contraseña nueva</button>
+    </form>
+    <a class="volver" href="/login.html">← Volver a iniciar sesión</a>
+  </div>
+
+<script>
+  const form = document.getElementById('recuperarForm');
+  const errorBox = document.getElementById('error');
+  const okBox = document.getElementById('ok');
+  const nuevaPassEl = document.getElementById('nuevaPass');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorBox.style.display = 'none';
+    okBox.style.display = 'none';
+    const email = document.getElementById('email').value;
+    try {
+      const res = await fetch('/api/recuperar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errorBox.textContent = data.error || 'No se pudo generar la contraseña';
+        errorBox.style.display = 'block';
+        return;
+      }
+      nuevaPassEl.textContent = data.nuevaPass;
+      okBox.style.display = 'block';
+      form.style.display = 'none';
+    } catch (err) {
+      errorBox.textContent = 'Error de conexión con el servidor';
+      errorBox.style.display = 'block';
+    }
+  });
+</script>
+</body>
+</html>

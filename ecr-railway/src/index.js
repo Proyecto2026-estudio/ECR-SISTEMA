@@ -8,15 +8,12 @@ const cors    = require('cors');
 const db      = require('./db');
 
 const app  = express();
+app.use(express.static(require('path').join(__dirname, '..', 'public')));
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 
-// ── Ruta de prueba ──────────────────────────────────────────
-app.get('/', (req, res) => {
-  res.json({ ok: true, msg: 'API ECR funcionando ✓' });
-});
 
 // ══════════════════════════════════════════════════════════
 //  CLIENTES

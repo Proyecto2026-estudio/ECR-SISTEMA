@@ -109,6 +109,19 @@ app.put('/api/usuarios/:id/password', requireAuth, requireAdmin, async (req, res
   } catch (e) { res.status(500).json({ error: 'Error de servidor' }); }
 });
 
+app.post('/api/recuperar', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Falta el email' });
+    const [rows] = await db.query('SELECT * FROM usuarios WHERE email = ?', [email]);
+    if (rows.length === 0) return res.status(404).json({ error: 'No existe un usuario con ese email' });
+    const nuevaPass = crypto.randomBytes(4).toString('hex');
+    const hash = hashPassword(nuevaPass);
+    await db.query('UPDATE usuarios SET password_hash = ? WHERE id = ?', [hash, rows[0].id]);
+    res.json({ ok: true, nuevaPass });
+  } catch (e) { res.status(500).json({ error: 'Error de servidor' }); }
+});
+
 
 // ══════════════════════════════════════════════════════════
 //  CLIENTES

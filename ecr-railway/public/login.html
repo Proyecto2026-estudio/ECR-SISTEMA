@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Iniciar sesión · ECR</title>
+<title>Iniciar sesión · ECR</title>}
+ 
 <style>
   * { box-sizing: border-box; }
   body {
@@ -29,6 +30,14 @@
     background: #fdecea; color: #c0392b; padding: 0.6rem; border-radius: 6px;
     font-size: 0.85rem; margin-bottom: 1rem; display: none;
   }
+   .password-wrap { position: relative; }
+  .password-wrap input { padding-right: 2.5rem; }
+  #togglePassword {
+    position: absolute; right: 0.4rem; top: 50%; transform: translateY(-50%);
+    width: auto; padding: 0.2rem 0.4rem; background: none; border: none;
+    cursor: pointer; font-size: 1.1rem; line-height: 1;
+  }
+  #togglePassword:hover { opacity: 0.7; }
 </style>
 </head>
 <body>
@@ -38,8 +47,11 @@
     <form id="loginForm">
       <label for="email">Email</label>
       <input type="email" id="email" required>
-      <label for="password">Contraseña</label>
-      <input type="password" id="password" required>
+          <label for="password">Contraseña</label>
+      <div class="password-wrap">
+        <input type="password" id="password" required>
+        <button type="button" id="togglePassword" aria-label="Mostrar contraseña">👁</button>
+      </div>
       <button type="submit">Ingresar</button>
     </form>
   </div>
@@ -47,6 +59,13 @@
 <script>
   const form = document.getElementById('loginForm');
   const errorBox = document.getElementById('error');
+   const passwordInput = document.getElementById('password');
+  const toggleBtn = document.getElementById('togglePassword');
+  toggleBtn.addEventListener('click', () => {
+    const isHidden = passwordInput.type === 'password';
+    passwordInput.type = isHidden ? 'text' : 'password';
+    toggleBtn.textContent = isHidden ? '🙈' : '👁';
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();

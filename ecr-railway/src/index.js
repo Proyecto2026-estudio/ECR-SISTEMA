@@ -8,7 +8,7 @@ const cors    = require('cors');
 const db      = require('./db');
 
 const app  = express();
-app.use(express.static(require('path').join(__dirname, '..', 'public')));
+app.use(express.static(require('path').join(__dirname, '..', 'public'), { index: 'login.html' }));
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());

@@ -290,6 +290,15 @@
     .cc { min-height: 64px; }
     .srch { width: 140px; }
   }
+    .user-menu { position:relative; display:flex; align-items:center; gap:0.6rem; cursor:pointer; }
+  .user-info { text-align:right; line-height:1.2; }
+  .user-info strong { display:block; font-size:0.9rem; color:#16161a; }
+  .user-info span { display:block; font-size:0.75rem; color:#8a8576; text-transform:capitalize; }
+  .user-avatar { width:38px; height:38px; border-radius:50%; background:#b08d3c; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:0.9rem; }
+  .user-dropdown { position:absolute; top:110%; right:0; background:#fff; border:1px solid #e2ddd2; border-radius:8px; box-shadow:0 8px 20px rgba(0,0,0,0.12); min-width:160px; display:none; z-index:50; overflow:hidden; }
+  .user-dropdown.open { display:block; }
+  .user-dropdown button { width:100%; padding:0.7rem 1rem; background:none; border:none; text-align:left; cursor:pointer; font-size:0.9rem; color:#c0392b; }
+  .user-dropdown button:hover { background:#faf9f6; }
 </style>
 </head>
 <body>
@@ -347,7 +356,6 @@
             <button id="logoutBtn">Cerrar sesión</button>
           </div>
         </div>
-      </div>
       </div>
     </header>
 
@@ -986,6 +994,26 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
     }
   }
 
+    function initUserMenu(){
+    const usuarioRaw = localStorage.getItem('ecr_usuario');
+    const usuario = usuarioRaw ? JSON.parse(usuarioRaw) : null;
+    if (usuario) {
+      $('userNombre').textContent = usuario.nombre;
+      $('userRol').textContent = usuario.rol;
+      const iniciales = usuario.nombre.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase();
+      $('userAvatar').textContent = iniciales;
+    }
+    const menu = $('userMenu'), dropdown = $('userDropdown');
+    menu.addEventListener('click', e => { dropdown.classList.toggle('open'); e.stopPropagation(); });
+    document.addEventListener('click', () => dropdown.classList.remove('open'));
+    $('logoutBtn').addEventListener('click', e => {
+      e.stopPropagation();
+      localStorage.removeItem('ecr_token');
+      localStorage.removeItem('ecr_usuario');
+      window.location.href = '/login.html';
+    });
+  }
+  initUserMenu();
   // ── INIT ──
   (async()=>{ await loadAll(); renderAll(); })();
   try{ const k=GKEY(); if(k && $('cfg-key')) $('cfg-key').value=k; }catch(e){}

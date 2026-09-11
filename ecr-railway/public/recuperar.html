@@ -4,56 +4,152 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Recuperar contraseña · ECR</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  * { box-sizing: border-box; }
+  :root {
+    --navy: #16161a;
+    --navy-2: #232329;
+    --gold: #b08d3c;
+    --gold-2: #c9a24a;
+    --gold-soft: #f3ecd9;
+    --bg: #f3f1ec;
+    --bg-soft: #faf9f6;
+    --line: #e2ddd2;
+    --ink: #1a1f2b;
+    --ink-2: #4a5161;
+    --muted: #8a8576;
+    --red: #9c3a3a;
+    --red-soft: #f3e3e3;
+    --green: #3a6b4f;
+    --green-soft: #e6efe8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    font-family: system-ui, sans-serif; background: #16161a;
+    font-family: 'Inter', sans-serif; min-height: 100vh; display: flex;
+    background: var(--bg); color: var(--ink); font-size: 14px;
   }
-  .card {
-    background: #fff; padding: 2.5rem; border-radius: 12px; width: 100%; max-width: 360px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  h1, h2, h3 { font-family: 'Lora', serif; }
+  .side {
+    flex: 1.1; background: var(--navy); color: #fff; display: flex; flex-direction: column;
+    justify-content: space-between; padding: 3rem 3.2rem; position: relative; overflow: hidden;
+    min-height: 100vh;
   }
-  h1 { font-size: 1.3rem; margin: 0 0 0.5rem; color: #16161a; text-align: center; }
-  p.sub { font-size: 0.85rem; color: #666; text-align: center; margin: 0 0 1.5rem; }
-  label { display: block; font-size: 0.85rem; margin-bottom: 0.3rem; color: #444; }
-  input {
-    width: 100%; padding: 0.7rem; margin-bottom: 1rem; border: 1px solid #e2ddd2;
-    border-radius: 6px; font-size: 1rem;
+  .side::before {
+    content: ''; position: absolute; inset: 0;
+    background-image: radial-gradient(circle at 15% 20%, rgba(176,141,60,.14), transparent 40%),
+                       radial-gradient(circle at 85% 85%, rgba(176,141,60,.10), transparent 45%);
+    pointer-events: none;
   }
-  button {
-    width: 100%; padding: 0.8rem; background: #b08d3c; color: #fff; border: none;
-    border-radius: 6px; font-size: 1rem; cursor: pointer;
+  .side-top, .side-bottom { position: relative; z-index: 1; }
+  .crest {
+    width: 58px; height: 58px; border: 1.5px solid var(--gold); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Lora', serif; font-weight: 700; font-size: 1.7rem; color: var(--gold);
+    margin-bottom: 1.6rem;
   }
-  button:hover { opacity: 0.9; }
+  .side-top h1 { font-size: 1.9rem; font-weight: 600; line-height: 1.25; margin-bottom: 0.6rem; }
+  .side-top .sub {
+    font-size: 0.76rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-2);
+    font-weight: 600; margin-bottom: 2.5rem;
+  }
+  .quote {
+    font-family: 'Lora', serif; font-style: italic; font-size: 1.05rem; line-height: 1.65;
+    color: #c3cbd9; max-width: 380px; border-left: 2px solid var(--gold); padding-left: 1.2rem;
+  }
+  .side-bottom { display: flex; align-items: center; gap: 0.9rem; padding-top: 2rem; border-top: 1px solid rgba(255,255,255,.1); }
+  .side-bottom .yrs {
+    font-family: 'Lora', serif; font-weight: 700; font-size: 1.6rem; color: var(--gold);
+    line-height: 1;
+  }
+  .side-bottom .txt { font-size: 0.76rem; color: #9aa4b8; line-height: 1.4; }
+  .side-bottom .txt strong { display: block; color: #fff; font-size: 0.85rem; margin-bottom: 0.1rem; }
+  .right { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+  .form-wrap { width: 100%; max-width: 360px; }
+  .form-wrap h2 { font-size: 1.5rem; font-weight: 600; color: var(--ink); margin-bottom: 0.35rem; }
+  .form-wrap .lead { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
   .error {
-    background: #fdecea; color: #c0392b; padding: 0.6rem; border-radius: 6px;
-    font-size: 0.85rem; margin-bottom: 1rem; display: none;
+    background: var(--red-soft); color: var(--red); padding: 0.7rem 0.9rem; border-radius: 6px;
+    font-size: 0.83rem; margin-bottom: 1.2rem; display: none; border-left: 3px solid var(--red);
   }
   .ok {
-    background: #eafaf1; color: #1e8449; padding: 0.8rem; border-radius: 6px;
-    font-size: 0.9rem; margin-bottom: 1rem; display: none; text-align: center;
+    background: var(--green-soft); color: var(--green); padding: 1rem; border-radius: 6px;
+    font-size: 0.9rem; margin-bottom: 1.2rem; display: none; text-align: center;
+    border-left: 3px solid var(--green);
   }
-  .ok strong { display: block; font-size: 1.2rem; margin-top: 0.4rem; letter-spacing: 1px; }
-  a.volver { display: block; text-align: center; margin-top: 1rem; font-size: 0.85rem; color: #666; text-decoration: none; }
-  a.volver:hover { text-decoration: underline; }
+  .ok strong {
+    display: block; font-family: 'Lora', serif; font-size: 1.3rem; margin-top: 0.5rem;
+    letter-spacing: 1px; color: var(--ink);
+  }
+  label { display: block; font-size: 0.76rem; font-weight: 600; color: var(--ink-2); margin-bottom: 0.4rem; letter-spacing: 0.02em; }
+  .fld { margin-bottom: 1.2rem; }
+  input {
+    width: 100%; padding: 0.75rem 0.9rem; background: var(--bg-soft); border: 1px solid var(--line);
+    border-radius: 6px; font-family: 'Inter'; font-size: 0.92rem; color: var(--ink); transition: border-color .15s;
+  }
+  input:focus { outline: none; border-color: var(--gold); background: #fff; }
+  input::placeholder { color: #b5b0a2; }
+  button[type="submit"] {
+    width: 100%; padding: 0.8rem; background: var(--gold); color: #fff; border: none;
+    border-radius: 6px; font-family: 'Inter'; font-weight: 600; font-size: 0.92rem; cursor: pointer;
+    transition: background .15s; margin-top: 0.4rem;
+  }
+  button[type="submit"]:hover { background: var(--gold-2); }
+  a.volver {
+    display: block; text-align: center; margin-top: 1.4rem; font-size: 0.82rem;
+    color: var(--muted); text-decoration: none;
+  }
+  a.volver:hover { color: var(--gold); text-decoration: underline; }
+  .foot-note {
+    margin-top: 2.5rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+    font-size: 0.72rem; color: var(--muted); text-align: center; line-height: 1.5;
+  }
+  @media (max-width: 860px) {
+    body { flex-direction: column; }
+    .side { min-height: auto; padding: 2.2rem 1.8rem; }
+    .quote { display: none; }
+    .side-bottom { display: none; }
+    .right { padding: 2.2rem 1.6rem; }
+  }
 </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Recuperar contraseña</h1>
-    <p class="sub">Ingresá tu email y te generamos una contraseña temporal.</p>
-    <div class="error" id="error"></div>
-    <div class="ok" id="ok">
-      Tu contraseña nueva es:
-      <strong id="nuevaPass"></strong>
+
+  <div class="side">
+    <div class="side-top">
+      <div class="crest">EC</div>
+      <h1>Estudio Casil<br>Rodríguez</h1>
+      <div class="sub">Sistema de gestión contable</div>
+      <p class="quote">"La confianza se construye con transparencia, y la transparencia con buenos números."</p>
     </div>
-    <form id="recuperarForm">
-      <label for="email">Email</label>
-      <input type="email" id="email" required>
-      <button type="submit">Generar contraseña nueva</button>
-    </form>
-    <a class="volver" href="/login.html">← Volver a iniciar sesión</a>
+    <div class="side-bottom">
+      <div class="yrs">50</div>
+      <div class="txt"><strong>Años de trayectoria</strong>Tres de Febrero, Buenos Aires</div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="form-wrap">
+      <h2>Recuperar contraseña</h2>
+      <p class="lead">Ingresá tu email y te generamos una contraseña temporal.</p>
+
+      <div class="error" id="error"></div>
+      <div class="ok" id="ok">
+        Tu contraseña nueva es:
+        <strong id="nuevaPass"></strong>
+      </div>
+
+      <form id="recuperarForm">
+        <div class="fld">
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="tu@estudio.com" required>
+        </div>
+        <button type="submit">Generar contraseña nueva</button>
+      </form>
+
+      <a class="volver" href="/login.html">← Volver a iniciar sesión</a>
+
+      <div class="foot-note">Acceso exclusivo para personal autorizado del estudio.</div>
+    </div>
   </div>
 
 <script>

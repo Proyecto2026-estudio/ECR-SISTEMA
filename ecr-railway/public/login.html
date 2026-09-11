@@ -27,8 +27,6 @@
     background: var(--bg); color: var(--ink); font-size: 14px;
   }
   h1, h2, h3 { font-family: 'Lora', serif; }
-
-  /* ── PANEL IZQUIERDO ── */
   .side {
     flex: 1.1; background: var(--navy); color: #fff; display: flex; flex-direction: column;
     justify-content: space-between; padding: 3rem 3.2rem; position: relative; overflow: hidden;
@@ -63,22 +61,138 @@
   }
   .side-bottom .txt { font-size: 0.76rem; color: #9aa4b8; line-height: 1.4; }
   .side-bottom .txt strong { display: block; color: #fff; font-size: 0.85rem; margin-bottom: 0.1rem; }
-
-  /* ── PANEL DERECHO ── */
   .right { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; }
   .form-wrap { width: 100%; max-width: 360px; }
   .form-wrap h2 { font-size: 1.5rem; font-weight: 600; color: var(--ink); margin-bottom: 0.35rem; }
   .form-wrap .lead { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
-
   .error {
     background: var(--red-soft); color: var(--red); padding: 0.7rem 0.9rem; border-radius: 6px;
     font-size: 0.83rem; margin-bottom: 1.2rem; display: none; border-left: 3px solid var(--red);
   }
-
   label { display: block; font-size: 0.76rem; font-weight: 600; color: var(--ink-2); margin-bottom: 0.4rem; letter-spacing: 0.02em; }
   .fld { margin-bottom: 1.2rem; }
   input {
     width: 100%; padding: 0.75rem 0.9rem; background: var(--bg-soft); border: 1px solid var(--line);
     border-radius: 6px; font-family: 'Inter'; font-size: 0.92rem; color: var(--ink); transition: border-color .15s;
   }
-  input:focus { outline: none;
+  input:focus { outline: none; border-color: var(--gold); background: #fff; }
+  input::placeholder { color: #b5b0a2; }
+  .password-wrap { position: relative; }
+  .password-wrap input { padding-right: 2.6rem; }
+  #togglePassword {
+    position: absolute; right: 0.5rem; top: 0; bottom: 0; margin: auto 0;
+    display: flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; padding: 0; background: none; border: none; cursor: pointer;
+  }
+  #togglePassword:hover { opacity: 0.6; }
+  #eyeIcon { position: relative; top: -1px; }
+  button[type="submit"] {
+    width: 100%; padding: 0.8rem; background: var(--gold); color: #fff; border: none;
+    border-radius: 6px; font-family: 'Inter'; font-weight: 600; font-size: 0.92rem; cursor: pointer;
+    transition: background .15s; margin-top: 0.4rem;
+  }
+  button[type="submit"]:hover { background: var(--gold-2); }
+  a.olvido {
+    display: block; text-align: center; margin-top: 1.4rem; font-size: 0.82rem;
+    color: var(--muted); text-decoration: none;
+  }
+  a.olvido:hover { color: var(--gold); text-decoration: underline; }
+  .foot-note {
+    margin-top: 2.5rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+    font-size: 0.72rem; color: var(--muted); text-align: center; line-height: 1.5;
+  }
+  @media (max-width: 860px) {
+    body { flex-direction: column; }
+    .side { min-height: auto; padding: 2.2rem 1.8rem; }
+    .quote { display: none; }
+    .side-bottom { display: none; }
+    .right { padding: 2.2rem 1.6rem; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="side">
+    <div class="side-top">
+      <div class="crest">EC</div>
+      <h1>Estudio Casil<br>Rodríguez</h1>
+      <div class="sub">Sistema de gestión contable</div>
+      <p class="quote">"La confianza se construye con transparencia, y la transparencia con buenos números."</p>
+    </div>
+    <div class="side-bottom">
+      <div class="yrs">50</div>
+      <div class="txt"><strong>Años de trayectoria</strong>Tres de Febrero, Buenos Aires</div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="form-wrap">
+      <h2>Bienvenido</h2>
+      <p class="lead">Ingresá tus credenciales para acceder al sistema.</p>
+
+      <div class="error" id="error"></div>
+
+      <form id="loginForm">
+        <div class="fld">
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="tu@estudio.com" required>
+        </div>
+        <div class="fld">
+          <label for="password">Contraseña</label>
+          <div class="password-wrap">
+            <input type="password" id="password" placeholder="••••••••" required>
+            <button type="button" id="togglePassword" aria-label="Mostrar contraseña"><svg id="eyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16161a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+          </div>
+        </div>
+        <button type="submit">Ingresar</button>
+      </form>
+
+      <a class="olvido" href="/recuperar.html">¿Olvidaste tu contraseña?</a>
+
+      <div class="foot-note">Acceso exclusivo para personal autorizado del estudio.</div>
+    </div>
+  </div>
+
+<script>
+  const form = document.getElementById('loginForm');
+  const errorBox = document.getElementById('error');
+  const passwordInput = document.getElementById('password');
+  const toggleBtn = document.getElementById('togglePassword');
+  const eyeIcon = document.getElementById('eyeIcon');
+  const eyeOpen = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"></path><circle cx="12" cy="12" r="3"></circle>';
+  const eyeClosed = '<path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.6 21.6 0 0 1 5.06-6.06"></path><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.6 21.6 0 0 1-2.16 3.19"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+
+  toggleBtn.addEventListener('click', () => {
+    const isHidden = passwordInput.type === 'password';
+    passwordInput.type = isHidden ? 'text' : 'password';
+    eyeIcon.innerHTML = isHidden ? eyeClosed : eyeOpen;
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorBox.style.display = 'none';
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errorBox.textContent = data.error || 'No se pudo iniciar sesión';
+        errorBox.style.display = 'block';
+        return;
+      }
+      localStorage.setItem('ecr_token', data.token);
+      localStorage.setItem('ecr_usuario', JSON.stringify(data.usuario));
+      window.location.href = '/index.html';
+    } catch (err) {
+      errorBox.textContent = 'Error de conexión con el servidor';
+      errorBox.style.display = 'block';
+    }
+  });
+</script>
+</body>
+</html>

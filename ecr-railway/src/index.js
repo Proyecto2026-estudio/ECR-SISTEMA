@@ -220,7 +220,7 @@ app.delete('/api/vencimientos/:id', async (req, res) => {
 app.get('/api/documentos', async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT d.*, c.nombre AS cliente_nombre
+      `SELECT d.id, d.nombre, d.tipo, d.cliente_id, d.fecha, d.archivo_mime, d.archivo_nombre_original, c.nombre AS cliente_nombre
        FROM documentos d
        LEFT JOIN clientes c ON d.cliente_id = c.id
        ORDER BY d.id DESC`

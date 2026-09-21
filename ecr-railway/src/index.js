@@ -230,15 +230,27 @@ app.get('/api/documentos', async (req, res) => {
 });
 
 app.post('/api/documentos', async (req, res) => {
-  const { nombre, tipo, cliente_id, fecha } = req.body;
+  const { nombre, tipo, cliente_id, fecha, archivo_data, archivo_mime, archivo_nombre_original } = req.body;
   if (!nombre) return res.status(400).json({ error: 'El nombre es obligatorio' });
   try {
     const [r] = await db.query(
-      'INSERT INTO documentos (nombre,tipo,cliente_id,fecha) VALUES (?,?,?,?)',
-      [nombre, tipo||'Otro', cliente_id||null, fecha||new Date().toISOString().slice(0,10)]
+      'INSERT INTO documentos (nombre,tipo,cliente_id,fecha,archivo_data,archivo_mime,archivo_nombre_original) VALUES (?,?,?,?,?,?,?)',
+      [nombre, tipo||'Otro', cliente_id||null, fecha||new Date().toISOString().slice(0,10), archivo_data||null, archivo_mime||null, archivo_nombre_original||null]
     );
     res.status(201).json({ ok: true, id: r.insertId });
   } catch (e) { res.status(500).json({ error: 'Error al guardar' }); }
+});
+
+app.get('/api/documentos/:id/archivo', async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT archivo_data, archivo_mime, archivo_nombre_original FROM documentos WHERE id = ?', [req.params.id]);
+    if (rows.length === 0 || !rows[0].archivo_data) return res.status(404).json({ error: 'No hay archivo cargado para este documento' });
+    const doc = rows[0];
+    const buffer = Buffer.from(doc.archivo_data, 'base64');
+    res.setHeader('Content-Type', doc.archivo_mime || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${doc.archivo_nombre_original || 'archivo'}"`);
+    res.send(buffer);
+  } catch (e) { res.status(500).json({ error: 'Error al leer el archivo' }); }
 });
 
 app.delete('/api/documentos/:id', async (req, res) => {

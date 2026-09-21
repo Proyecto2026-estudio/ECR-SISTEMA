@@ -12,7 +12,7 @@ app.use(express.static(require('path').join(__dirname, '..', 'public'), { index:
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
 // ============================================================
 //  AUTENTICACIÓN · Login, sesiones y recuperación simple
 // ============================================================

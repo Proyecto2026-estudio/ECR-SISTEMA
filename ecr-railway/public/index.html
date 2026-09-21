@@ -709,14 +709,29 @@
   }
 
   // ── DOCS ──
-  function docModal(){ fillCli($('di-c')); $('di-n').value=''; $('di-t').value='Balance'; openM('m-doc'); }
-  async function docSave(){
-    const nombre=$('di-n').value.trim();
-    if(!nombre){ toast('Ingresá un nombre'); return; }
-    const data = { nombre, tipo:$('di-t').value, cliente_id:$('di-c').value||null, fecha:new Date().toISOString().slice(0,10) };
-    try{ await api('/api/documentos','POST',data); await loadAll(); closeM('m-doc'); renderAll(); toast('Documento cargado ✓'); }
-    catch(e){ toast('Error al guardar: '+e.message); }
+function docModal(){ fillCli($('di-c')); $('di-n').value=''; $('di-t').value='Balance'; $('di-f').value=''; $('di-f-info').textContent=''; openM('m-doc'); }
+function fileToBase64(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+async function docSave(){
+  const nombre=$('di-n').value.trim();
+  if(!nombre){ toast('Ingresá un nombre'); return; }
+  const data = { nombre, tipo:$('di-t').value, cliente_id:$('di-c').value||null, fecha:new Date().toISOString().slice(0,10) };
+  const file = $('di-f').files[0];
+  if(file){
+    if(file.size > 9*1024*1024){ toast('El archivo es muy pesado (máximo ~9MB)'); return; }
+    data.archivo_data = await fileToBase64(file);
+    data.archivo_mime = file.type || 'application/octet-stream';
+    data.archivo_nombre_original = file.name;
   }
+  try{ await api('/api/documentos','POST',data); await loadAll(); closeM('m-doc'); renderAll(); toast('Documento cargado ✓'); }
+  catch(e){ toast('Error al guardar: '+e.message); }
+}
   async function docDel(id){
     if(!confirm('¿Eliminar documento?')) return;
     try{ await api(`/api/documentos/${id}`,'DELETE'); await loadAll(); renderAll(); }

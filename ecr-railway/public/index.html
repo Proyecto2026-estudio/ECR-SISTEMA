@@ -724,7 +724,7 @@ async function docSave(){
   const data = { nombre, tipo:$('di-t').value, cliente_id:$('di-c').value||null, fecha:new Date().toISOString().slice(0,10) };
   const file = $('di-f').files[0];
   if(file){
-    if(file.size > 9*1024*1024){ toast('El archivo es muy pesado (máximo ~9MB)'); return; }
+    if(file.size > 9*1024*1024){ toast('El archivo es muy pesado (máximo ~25MB)'); return; }
     data.archivo_data = await fileToBase64(file);
     data.archivo_mime = file.type || 'application/octet-stream';
     data.archivo_nombre_original = file.name;

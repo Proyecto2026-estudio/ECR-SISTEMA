@@ -572,7 +572,7 @@
       ]);
       DB.clientes = cli.map(c=>({ id:String(c.id), nombre:c.nombre, cuit:c.cuit, honorarios:c.honorarios, servicio:c.servicio, estado:c.estado }));
       DB.venc = ven.map(v=>({ id:String(v.id), desc:v.descripcion, cli:v.cliente_id?String(v.cliente_id):'', tipo:v.tipo, fecha:(v.fecha||'').slice(0,10), estado:v.estado }));
-      DB.docs = doc.map(d=>({ id:String(d.id), nombre:d.nombre, tipo:d.tipo, cli:d.cliente_id?String(d.cliente_id):'', fecha:(d.fecha||'').slice(0,10) }));
+      DB.docs = doc.map(d=>({ id:String(d.id), nombre:d.nombre, tipo:d.tipo, cli:d.cliente_id?String(d.cliente_id):'', fecha:(d.fecha||'').slice(0,10), archivo_mime:d.archivo_mime||null }));
     }catch(e){ toast('No se pudo conectar con el servidor'); }
   }
   const cliName = id => { const c = DB.clientes.find(x=>x.id===id); return c?c.nombre:'General del estudio'; };

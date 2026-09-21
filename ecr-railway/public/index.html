@@ -277,6 +277,8 @@
   .fld input, .fld select { width: 100%; padding: 0.6rem 0.8rem; background: var(--bg-soft); border: 1px solid var(--line); border-radius: 6px; color: var(--ink); font-family: 'Inter'; font-size: 0.85rem; }
   .fld input:focus, .fld select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
   .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+  .file-picker { display:flex; align-items:center; gap:0.7rem; flex-wrap:wrap; }
+.file-picker #di-f-info { font-size:0.8rem; color:var(--muted); }
 
   /* ─── TOAST ─── */
   .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translate(-50%, 160%); background: var(--navy); color: #fff; padding: 0.8rem 1.4rem; border-radius: 7px; font-weight: 600; font-size: 0.85rem; box-shadow: var(--shadow-lg); z-index: 200; transition: transform .3s cubic-bezier(.2,.8,.2,1); }
@@ -529,7 +531,14 @@
     <div class="fld"><label>Nombre del documento</label><input id="di-n" placeholder="Balance 2025 - Distribuidora"></div>
     <div class="fld"><label>Tipo</label><select id="di-t"><option>Balance</option><option>Recibo de sueldo</option><option>DDJJ</option><option>Factura</option><option>Comprobante</option><option>Otro</option></select></div>
     <div class="fld"><label>Cliente asociado</label><select id="di-c"></select></div>
-    <div class="fld"><label>Archivo</label><input type="file" id="di-f"><div id="di-f-info" style="font-size:0.76rem;color:var(--muted);margin-top:0.3rem"></div></div>
+    <div class="fld">
+  <label>Archivo</label>
+  <div class="file-picker">
+    <input type="file" id="di-f" style="display:none">
+    <button type="button" class="btn btn-soft btn-sm" id="di-f-btn">📎 Elegir archivo</button>
+    <span id="di-f-info">Ningún archivo seleccionado</span>
+  </div>
+</div>
   </div>
   <div class="mf"><button class="btn btn-soft" data-close="m-doc">Cancelar</button><button class="btn btn-pri" id="docSave">Cargar documento</button></div>
 </div></div>
@@ -709,7 +718,12 @@
   }
 
   // ── DOCS ──
-function docModal(){ fillCli($('di-c')); $('di-n').value=''; $('di-t').value='Balance'; $('di-f').value=''; $('di-f-info').textContent=''; openM('m-doc'); }
+function docModal(){ fillCli($('di-c')); $('di-n').value=''; $('di-t').value='Balance'; $('di-f').value=''; $('di-f-info').textContent='Ningún archivo seleccionado'; openM('m-doc'); }
+  $('di-f-btn').addEventListener('click', () => $('di-f').click());
+$('di-f').addEventListener('change', () => {
+  const f = $('di-f').files[0];
+  $('di-f-info').textContent = f ? f.name : 'Ningún archivo seleccionado';
+});
 function fileToBase64(file){
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

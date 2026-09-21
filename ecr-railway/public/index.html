@@ -737,13 +737,17 @@ async function docSave(){
     try{ await api(`/api/documentos/${id}`,'DELETE'); await loadAll(); renderAll(); }
     catch(e){ toast('Error al eliminar'); }
   }
-  function renderDocs(){
-    const g=$('g-docs');
-    if(!DB.docs.length){ g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="e">▭</div>Sin documentos. Cargá el primero.</div>`; return; }
-    const ic={'Balance':'📊','Recibo de sueldo':'🧾','DDJJ':'📋','Factura':'🧮','Comprobante':'📑','Otro':'📁'};
-    g.innerHTML=DB.docs.map(d=>`<div class="doc" data-del-doc="${d.id}" title="Click para eliminar"><div class="di">${ic[d.tipo]||'📁'}</div><div class="dt">${esc(d.nombre)}</div><div class="dm">${esc(d.tipo)} · ${esc(cliName(d.cli))}</div><div class="dm">${new Date(d.fecha+'T00:00').toLocaleDateString('es-AR')}</div></div>`).join('');
-    g.querySelectorAll('[data-del-doc]').forEach(b=>b.addEventListener('click',()=>docDel(b.dataset.delDoc)));
-  }
+ function renderDocs(){
+  const g=$('g-docs');
+  if(!DB.docs.length){ g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="e">▭</div>Sin documentos. Cargá el primero.</div>`; return; }
+  const ic={'Balance':'📊','Recibo de sueldo':'🧾','DDJJ':'📋','Factura':'🧮','Comprobante':'📑','Otro':'📁'};
+  g.innerHTML=DB.docs.map(d=>{
+    const tieneArchivo = !!d.archivo_mime;
+    const verBtn = tieneArchivo ? `<a href="${API_BASE}/api/documentos/${d.id}/archivo" target="_blank" rel="noopener" class="btn btn-soft btn-sm" style="margin-top:0.5rem" onclick="event.stopPropagation()">Ver archivo</a>` : `<div class="dm" style="margin-top:0.5rem;font-style:italic">Sin archivo adjunto</div>`;
+    return `<div class="doc" data-del-doc="${d.id}" title="Click en la tarjeta para eliminar"><div class="di">${ic[d.tipo]||'📁'}</div><div class="dt">${esc(d.nombre)}</div><div class="dm">${esc(d.tipo)} · ${esc(cliName(d.cli))}</div><div class="dm">${new Date(d.fecha+'T00:00').toLocaleDateString('es-AR')}</div>${verBtn}</div>`;
+  }).join('');
+  g.querySelectorAll('[data-del-doc]').forEach(b=>b.addEventListener('click',()=>docDel(b.dataset.delDoc)));
+}
 
   // ── INICIO ──
   function renderHome(){

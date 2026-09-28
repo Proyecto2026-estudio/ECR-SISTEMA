@@ -644,7 +644,6 @@
       await loadAll(); closeM('m-cli'); renderAll(); toast('Cliente guardado ✓');
     }catch(e){ toast('Error al guardar: '+e.message); }
   }
-  }
   async function cliDel(id){
     if(!confirm('¿Eliminar este cliente?')) return;
     try{ await api(`/api/clientes/${id}`,'DELETE'); await loadAll(); renderAll(); toast('Cliente eliminado'); }

@@ -856,20 +856,14 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   }
 
   // Motor 1: Google Gemini (clave gratis — funciona en cualquier hosting)
-  async function geminiCall(q, useSearch){
-    const key = GKEY();
-    const body = {
-      systemInstruction:{ parts:[{ text: sysPrompt() }] },
-      contents:[{ role:'user', parts:[{ text:q }] }]
-    };
-    if(useSearch) body.tools = [{ google_search:{} }];
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`, {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+    async function geminiCall(q, useSearch){
+    const res = await fetch(`${API_BASE}/api/asistente`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ prompt:q, system: sysPrompt(), useSearch })
     });
-    if(!res.ok){ const tx=await res.text().catch(()=>''); const err=new Error('HTTP '+res.status+' '+tx.slice(0,160)); err.status=res.status; throw err; }
+    if(!res.ok){ const j=await res.json().catch(()=>({})); const err=new Error(j.error||('HTTP '+res.status)); err.status=res.status; throw err; }
     const data = await res.json();
-    const parts = ((((data.candidates||[])[0]||{}).content||{}).parts)||[];
-    return parts.map(p=>p.text||'').join('').trim() || 'No obtuve respuesta.';
+    return data.text || 'No obtuve respuesta.';
   }
   async function askGemini(q){
     try{
@@ -903,9 +897,8 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   }
 
   // Elige motor: si hay clave Gemini la usa (deploy real); si no, intenta Claude (preview)
-  async function getAnswer(q){
-    if(GKEY()) return await askGemini(q);
-    return await askClaude(q);
+   async function getAnswer(q){
+    return await askGemini(q);
   }
 
   async function send(){

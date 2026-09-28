@@ -259,6 +259,30 @@ app.delete('/api/documentos/:id', async (req, res) => {
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: 'Error al eliminar' }); }
 });
+// ══════════════════════════════════════════════════════════
+//  ASISTENTE (proxy a Gemini, clave guardada en el servidor)
+// ══════════════════════════════════════════════════════════
+app.post('/api/asistente', async (req, res) => {
+  try {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) return res.status(500).json({ error: 'Falta configurar GEMINI_API_KEY en Railway' });
+    const { prompt, system, useSearch } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'Falta la consulta' });
+    const body = {
+      systemInstruction: { parts: [{ text: system || '' }] },
+      contents: [{ role: 'user', parts: [{ text: prompt }] }]
+    };
+    if (useSearch) body.tools = [{ google_search: {} }];
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    if (!r.ok) { const t = await r.text(); return res.status(r.status).json({ error: t.slice(0,200) }); }
+    const data = await r.json();
+    const parts = ((((data.candidates||[])[0]||{}).content||{}).parts)||[];
+    const text = parts.map(p=>p.text||'').join('').trim() || 'No obtuve respuesta.';
+    res.json({ text });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // ── Arrancar servidor ────────────────────────────────────
 app.listen(PORT, () => {

@@ -499,7 +499,7 @@
     <input type="hidden" id="ci-id">
     <div class="fld"><label>Razón social / Empresa</label><input id="ci-n" placeholder="Distribuidora del Oeste S.A."></div>
     <div class="frow">
-      <div class="fld"><label>CUIT</label><input id="ci-c" placeholder="30-12345678-9"></div>
+      <div class="fld"><label>CUIT</label><input id="ci-c" placeholder="30-12345678-9" maxlength="13" inputmode="numeric"></div>
       <div class="fld"><label>Honorarios ($/mes)</label><input id="ci-h" type="number" placeholder="45000"></div>
     </div>
     <div class="fld"><label>Servicio principal</label><select id="ci-s"><option>Asesoramiento integral</option><option>Sueldos + Impuestos</option><option>Contabilidad general</option><option>Monotributo</option><option>Balance + DDJJ</option></select></div>
@@ -611,15 +611,39 @@
     else { $('ci-id').value=''; $('ci-n').value=''; $('ci-c').value=''; $('ci-h').value=''; $('ci-s').value='Asesoramiento integral'; $('ci-e').value='Activo'; }
     openM('m-cli');
   }
+    function formatCUIT(v){
+    const d = v.replace(/\D/g,'').slice(0,11);
+    if(d.length<=2) return d;
+    if(d.length<=10) return d.slice(0,2)+'-'+d.slice(2);
+    return d.slice(0,2)+'-'+d.slice(2,10)+'-'+d.slice(10);
+  }
+  function validarCUIT(cuit){
+    const d = cuit.replace(/\D/g,'');
+    if(d.length!==11) return false;
+    const mult=[5,4,3,2,7,6,5,4,3,2];
+    let suma=0; for(let i=0;i<10;i++) suma += (+d[i])*mult[i];
+    let verif = 11 - (suma%11);
+    if(verif===11) verif=0;
+    if(verif===10) return false;
+    return verif === +d[10];
+  }
+  $('ci-c').addEventListener('input', e=>{ e.target.value = formatCUIT(e.target.value); });
+
   async function cliSave(){
     const nombre = $('ci-n').value.trim();
     if(!nombre){ toast('Ingresá la razón social'); return; }
-    const data = { nombre, cuit:$('ci-c').value.trim(), honorarios:+$('ci-h').value||0, servicio:$('ci-s').value, estado:$('ci-e').value };
+    const cuit = $('ci-c').value.trim();
+    if(cuit && !validarCUIT(cuit)){ toast('El CUIT ingresado no es válido'); return; }
+    const idActual = $('ci-id').value;
+    const dup = DB.clientes.find(c => c.cuit === cuit && c.id !== idActual);
+    if(cuit && dup){ toast('Ya existe un cliente cargado con ese CUIT'); return; }
+    const data = { nombre, cuit, honorarios:+$('ci-h').value||0, servicio:$('ci-s').value, estado:$('ci-e').value };
     const id = $('ci-id').value;
     try{
       if(id){ await api(`/api/clientes/${id}`,'PUT',data); } else { await api('/api/clientes','POST',data); }
       await loadAll(); closeM('m-cli'); renderAll(); toast('Cliente guardado ✓');
     }catch(e){ toast('Error al guardar: '+e.message); }
+  }
   }
   async function cliDel(id){
     if(!confirm('¿Eliminar este cliente?')) return;

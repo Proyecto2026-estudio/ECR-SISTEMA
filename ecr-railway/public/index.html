@@ -850,10 +850,13 @@ async function docSave(){
     return h;
   }
 
+  // Nota de privacidad: a este contexto NUNCA se le agregan CUIT ni honorarios
+  // (datos fiscales/financieros sensibles). Solo se manda lo mínimo necesario
+  // para que el asistente pueda ayudar con nombres, servicios y vencimientos.
   function localContext(){
-    const cli = DB.clientes.length ? DB.clientes.map(c=>`- ${c.nombre} (CUIT ${c.cuit||'s/d'}; ${c.servicio}; honorarios ${money(c.honorarios)}/mes; ${c.estado})`).join('\n') : '(sin clientes cargados)';
+    const cli = DB.clientes.length ? DB.clientes.map(c=>`- ${c.nombre} (${c.servicio}; ${c.estado})`).join('\n') : '(sin clientes cargados)';
     const ven = DB.venc.length ? [...DB.venc].sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).map(v=>`- ${v.desc} | ${cliName(v.cli)} | ${v.tipo} | ${v.fecha} | ${v.estado} (faltan ${dleft(v.fecha)} días)`).join('\n') : '(sin vencimientos cargados)';
-    return `Hoy es ${new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}.\n\nCLIENTES DEL ESTUDIO:\n${cli}\n\nVENCIMIENTOS CARGADOS EN EL SISTEMA:\n${ven}`;
+    return `Hoy es ${new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}.\n\nCLIENTES DEL ESTUDIO:\n${cli}\n\nVENCIMIENTOS CARGADOS EN EL SISTEMA:\n${ven}\n\n(No se incluyen CUIT ni honorarios por política de privacidad del estudio.)`;
   }
 
   function sysPrompt(){

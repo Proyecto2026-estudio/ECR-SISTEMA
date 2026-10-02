@@ -63,6 +63,23 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+// Roles del sistema: admin (acceso total), contador (gestión diaria, igual
+// que el histórico "usuario"), cliente_pyme (solo ve sus propios datos),
+// lectura (ve todo pero no puede crear/editar/borrar nada).
+const ROLES_VALIDOS = ['admin', 'contador', 'cliente_pyme', 'lectura', 'usuario'];
+function normalizarRol(r) { return ROLES_VALIDOS.includes(r) ? r : 'contador'; }
+
+// Migración liviana: agrega la columna cliente_id a usuarios si todavía no
+// existe (vincula a un usuario "Cliente PyME" con su registro en clientes).
+(async () => {
+  try {
+    await db.query('ALTER TABLE usuarios ADD COLUMN cliente_id INT NULL');
+    console.log('Migración: columna cliente_id agregada a usuarios');
+  } catch (e) {
+    if (e.code !== 'ER_DUP_FIELDNAME') console.error('Migración cliente_id:', e.message);
+  }
+})();
+
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -73,30 +90,63 @@ app.post('/api/login', async (req, res) => {
     const ok = verifyPassword(password, usuario.password_hash);
     if (!ok) return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
     const token = signToken(usuario);
-    res.json({ token, usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol } });
+    res.json({ token, usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol, cliente_id: usuario.cliente_id || null } });
   } catch (e) { res.status(500).json({ error: 'Error de servidor' }); }
 });
 
 app.get('/api/me', requireAuth, async (req, res) => {
-  const [rows] = await db.query('SELECT id, nombre, email, rol FROM usuarios WHERE id = ?', [req.usuario.id]);
+  const [rows] = await db.query('SELECT id, nombre, email, rol, cliente_id FROM usuarios WHERE id = ?', [req.usuario.id]);
   if (rows.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
   res.json(rows[0]);
 });
 
 app.get('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
-  const [rows] = await db.query('SELECT id, nombre, email, rol, creado_en FROM usuarios ORDER BY id');
+  const [rows] = await db.query(
+    `SELECT u.id, u.nombre, u.email, u.rol, u.cliente_id, u.creado_en, c.nombre AS cliente_nombre
+     FROM usuarios u LEFT JOIN clientes c ON u.cliente_id = c.id
+     ORDER BY u.id`
+  );
   res.json(rows);
 });
 
 app.post('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { nombre, email, password, rol } = req.body;
+    const { nombre, email, password, rol, cliente_id } = req.body;
     if (!nombre || !email || !password) return res.status(400).json({ error: 'Faltan datos' });
+    const rolFinal = normalizarRol(rol);
     const hash = hashPassword(password);
-    await db.query('INSERT INTO usuarios (nombre, email, password_hash, rol) VALUES (?,?,?,?)',
-      [nombre, email, hash, rol === 'admin' ? 'admin' : 'usuario']);
+    await db.query('INSERT INTO usuarios (nombre, email, password_hash, rol, cliente_id) VALUES (?,?,?,?,?)',
+      [nombre, email, hash, rolFinal, rolFinal === 'cliente_pyme' ? (cliente_id || null) : null]);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: 'No se pudo crear el usuario (¿email repetido?)' }); }
+});
+
+app.put('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { nombre, email, rol, cliente_id, password } = req.body;
+    if (!nombre || !email) return res.status(400).json({ error: 'Faltan datos' });
+    const rolFinal = normalizarRol(rol);
+    const cliFinal = rolFinal === 'cliente_pyme' ? (cliente_id || null) : null;
+    if (password) {
+      const hash = hashPassword(password);
+      await db.query('UPDATE usuarios SET nombre=?, email=?, rol=?, cliente_id=?, password_hash=? WHERE id=?',
+        [nombre, email, rolFinal, cliFinal, hash, req.params.id]);
+    } else {
+      await db.query('UPDATE usuarios SET nombre=?, email=?, rol=?, cliente_id=? WHERE id=?',
+        [nombre, email, rolFinal, cliFinal, req.params.id]);
+    }
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'No se pudo actualizar el usuario (¿email repetido?)' }); }
+});
+
+app.delete('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    if (String(req.params.id) === String(req.usuario.id)) {
+      return res.status(400).json({ error: 'No podés eliminar tu propio usuario' });
+    }
+    await db.query('DELETE FROM usuarios WHERE id=?', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Error al eliminar' }); }
 });
 
 app.put('/api/usuarios/:id/password', requireAuth, requireAdmin, async (req, res) => {

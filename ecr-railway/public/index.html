@@ -171,6 +171,8 @@
   .nm { font-weight: 600; color: var(--ink); }
   .mono { font-family: 'Inter'; font-variant-numeric: tabular-nums; font-size: 0.8rem; }
   .acts { display: flex; gap: 0.4rem; }
+  body.no-edit .acts, body.no-edit #addCli, body.no-edit #addVen, body.no-edit #addDoc, body.no-edit #addUsr, body.no-edit #newBtn { display: none !important; }
+  body.no-edit .doc { cursor: default; }
   .ib { width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink-2); cursor: pointer; font-size: 0.8rem; display: inline-flex; align-items: center; justify-content: center; transition: all .14s; }
   .ib:hover { border-color: var(--gold); color: var(--gold); }
   .ib.d:hover { border-color: var(--red); color: var(--red); }
@@ -330,6 +332,7 @@
       <div class="menu-i" data-v="asistente"><span class="mi">✦</span> Asistente</div>
       <div class="menu-i" data-v="reportes"><span class="mi">▥</span> Reportes</div>
       <div class="menu-cap">Sistema</div>
+      <div class="menu-i" data-v="usuarios"><span class="mi">◎</span> Usuarios</div>
       <div class="menu-i" data-v="ajustes"><span class="mi">⚙</span> Configuración</div>
     </nav>
     <div class="side-foot">
@@ -487,6 +490,15 @@
         </div></div>
       </section>
 
+      <!-- USUARIOS -->
+      <section class="view" id="v-usuarios">
+        <div class="tbar"><h2>Usuarios del sistema</h2><div class="r"><button class="btn btn-pri" id="addUsr">+ Usuario</button></div></div>
+        <div class="panel"><table>
+          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Cliente asociado</th><th></th></tr></thead>
+          <tbody id="t-usr"></tbody>
+        </table></div>
+      </section>
+
     </div>
   </div>
 </div>
@@ -543,6 +555,25 @@
   <div class="mf"><button class="btn btn-soft" data-close="m-doc">Cancelar</button><button class="btn btn-pri" id="docSave">Cargar documento</button></div>
 </div></div>
 
+<!-- MODAL USUARIO -->
+<div class="ov" id="m-usr"><div class="modal">
+  <div class="mh"><h3 id="usrTitle">Nuevo usuario</h3><button class="x" data-close="m-usr">×</button></div>
+  <div class="mb">
+    <input type="hidden" id="ui-id">
+    <div class="fld"><label>Nombre</label><input id="ui-n" placeholder="Nombre y apellido"></div>
+    <div class="fld"><label>Email</label><input id="ui-e" type="email" placeholder="correo@ejemplo.com"></div>
+    <div class="fld"><label id="ui-pass-label">Contraseña</label><input id="ui-p" type="password" placeholder="Mínimo 6 caracteres"></div>
+    <div class="fld"><label>Rol</label><select id="ui-r">
+      <option value="admin">Administrador</option>
+      <option value="contador">Contador</option>
+      <option value="cliente_pyme">Cliente PyME</option>
+      <option value="lectura">Solo lectura</option>
+    </select></div>
+    <div class="fld" id="ui-cli-wrap" style="display:none"><label>Cliente asociado</label><select id="ui-cli"></select></div>
+  </div>
+  <div class="mf"><button class="btn btn-soft" data-close="m-usr">Cancelar</button><button class="btn btn-pri" id="usrSave">Guardar usuario</button></div>
+</div></div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -557,6 +588,39 @@
   // ── conexión con el backend (Railway) ──
  const API_BASE = 'https://ecr-sistema.up.railway.app';
   const DB = { clientes:[], venc:[], docs:[] };
+
+  // ── USUARIO ACTUAL Y ROLES ──
+  const USUARIO_ACTUAL = (()=>{ try{ return JSON.parse(localStorage.getItem('ecr_usuario')||'null'); }catch(e){ return null; } })();
+  const ROL = (USUARIO_ACTUAL && USUARIO_ACTUAL.rol) || 'contador';
+  const MI_CLIENTE_ID = USUARIO_ACTUAL && USUARIO_ACTUAL.cliente_id ? String(USUARIO_ACTUAL.cliente_id) : null;
+  const ES_ADMIN = ROL === 'admin';
+  const ES_LECTURA = ROL === 'lectura';
+  const ES_PYME = ROL === 'cliente_pyme';
+  const PUEDE_EDITAR = !ES_LECTURA && !ES_PYME;
+  const ROL_LABEL = { admin:'Administrador', contador:'Contador', usuario:'Contador', cliente_pyme:'Cliente PyME', lectura:'Solo lectura' };
+  const NAV_OCULTO = {
+    admin: [],
+    contador: ['usuarios'],
+    usuario: ['usuarios'],
+    lectura: ['usuarios','ajustes'],
+    cliente_pyme: ['usuarios','ajustes','inicio','clientes','reportes']
+  };
+  function aplicarAlcanceRol(){
+    // Un Cliente PyME solo puede ver sus propios datos, nunca los de otro cliente del estudio.
+    if(ES_PYME && MI_CLIENTE_ID){
+      DB.clientes = DB.clientes.filter(c=>c.id===MI_CLIENTE_ID);
+      DB.venc = DB.venc.filter(v=>v.cli===MI_CLIENTE_ID);
+      DB.docs = DB.docs.filter(d=>d.cli===MI_CLIENTE_ID);
+    }
+  }
+  function aplicarPermisosUI(){
+    document.body.classList.toggle('no-edit', !PUEDE_EDITAR);
+    (NAV_OCULTO[ROL]||NAV_OCULTO.contador).forEach(v=>{
+      const el=document.querySelector(`.menu-i[data-v="${v}"]`); if(el) el.style.display='none';
+    });
+    const activo=document.querySelector('.menu-i.on');
+    if(activo && activo.style.display==='none') nav('agenda');
+  }
   async function api(path, method, body){
     const opts = { method: method||'GET', headers:{} };
     if(body!==undefined){ opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify(body); }
@@ -573,6 +637,7 @@
       DB.clientes = cli.map(c=>({ id:String(c.id), nombre:c.nombre, cuit:c.cuit, honorarios:c.honorarios, servicio:c.servicio, estado:c.estado }));
       DB.venc = ven.map(v=>({ id:String(v.id), desc:v.descripcion, cli:v.cliente_id?String(v.cliente_id):'', tipo:v.tipo, fecha:(v.fecha||'').slice(0,10), estado:v.estado }));
       DB.docs = doc.map(d=>({ id:String(d.id), nombre:d.nombre, tipo:d.tipo, cli:d.cliente_id?String(d.cliente_id):'', fecha:(d.fecha||'').slice(0,10), archivo_mime:d.archivo_mime||null }));
+      aplicarAlcanceRol();
     }catch(e){ toast('No se pudo conectar con el servidor'); }
   }
   const cliName = id => { const c = DB.clientes.find(x=>x.id===id); return c?c.nombre:'General del estudio'; };
@@ -580,7 +645,7 @@
   let calRef = new Date();
 
   // ── NAVEGACIÓN ──
-  const titles = { inicio:['Panel general','Resumen del estudio'], clientes:['Clientes','Cartera del estudio'], agenda:['Agenda de vencimientos','Calendario impositivo y laboral'], docs:['Archivo digital','Documentos del estudio'], asistente:['Asistente','Consultas del estudio'], reportes:['Reportes','Métricas y análisis'], ajustes:['Configuración','Ajustes del sistema'] };
+  const titles = { inicio:['Panel general','Resumen del estudio'], clientes:['Clientes','Cartera del estudio'], agenda:['Agenda de vencimientos','Calendario impositivo y laboral'], docs:['Archivo digital','Documentos del estudio'], asistente:['Asistente','Consultas del estudio'], reportes:['Reportes','Métricas y análisis'], ajustes:['Configuración','Ajustes del sistema'], usuarios:['Usuarios del sistema','Accesos y roles'] };
   function nav(v){
     document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));
     $('v-'+v).classList.add('on');
@@ -589,6 +654,7 @@
     $('vS').textContent = titles[v][1];
     if(v==='reportes') renderRep();
     if(v==='agenda') renderCal();
+    if(v==='usuarios') loadUsuarios().then(renderUsuarios);
   }
   document.querySelectorAll('.menu-i').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.v)));
   document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.go)));
@@ -793,9 +859,10 @@ async function docSave(){
   g.innerHTML=lista.map(d=>{
     const tieneArchivo = !!d.archivo_mime;
     const verBtn = tieneArchivo ? `<a href="${API_BASE}/api/documentos/${d.id}/archivo" target="_blank" rel="noopener" class="btn btn-soft btn-sm" style="margin-top:0.5rem" onclick="event.stopPropagation()">Ver archivo</a>` : `<div class="dm" style="margin-top:0.5rem;font-style:italic">Sin archivo adjunto</div>`;
-    return `<div class="doc" data-del-doc="${d.id}" title="Click en la tarjeta para eliminar"><div class="di">${ic[d.tipo]||'📁'}</div><div class="dt">${esc(d.nombre)}</div><div class="dm">${esc(d.tipo)} · ${esc(cliName(d.cli))}</div><div class="dm">${new Date(d.fecha+'T00:00').toLocaleDateString('es-AR')}</div>${verBtn}</div>`;
+    const titleAttr = PUEDE_EDITAR ? ' title="Click en la tarjeta para eliminar"' : '';
+    return `<div class="doc" data-del-doc="${d.id}"${titleAttr}><div class="di">${ic[d.tipo]||'📁'}</div><div class="dt">${esc(d.nombre)}</div><div class="dm">${esc(d.tipo)} · ${esc(cliName(d.cli))}</div><div class="dm">${new Date(d.fecha+'T00:00').toLocaleDateString('es-AR')}</div>${verBtn}</div>`;
   }).join('');
-  g.querySelectorAll('[data-del-doc]').forEach(b=>b.addEventListener('click',()=>docDel(b.dataset.delDoc)));
+  if(PUEDE_EDITAR) g.querySelectorAll('[data-del-doc]').forEach(b=>b.addEventListener('click',()=>docDel(b.dataset.delDoc)));
 }
 
   // ── INICIO ──
@@ -995,6 +1062,53 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
     }catch(e){ toast('Error al reiniciar datos'); }
   }
 
+  // ── USUARIOS (solo admin) ──
+  let USUARIOS=[];
+  function fillUsrCli(sel){ sel.innerHTML = DB.clientes.length ? DB.clientes.map(c=>`<option value="${c.id}">${esc(c.nombre)}</option>`).join('') : '<option value="">(sin clientes cargados)</option>'; }
+  function usrModal(u){
+    if(!$('m-usr')) return;
+    $('usrTitle').textContent = u ? 'Editar usuario' : 'Nuevo usuario';
+    fillUsrCli($('ui-cli'));
+    if(u){ $('ui-id').value=u.id; $('ui-n').value=u.nombre; $('ui-e').value=u.email; $('ui-p').value=''; $('ui-r').value=(u.rol==='usuario'?'contador':u.rol); $('ui-cli').value=u.cliente_id||''; $('ui-pass-label').textContent='Nueva contraseña (dejar vacío para no cambiar)'; }
+    else { $('ui-id').value=''; $('ui-n').value=''; $('ui-e').value=''; $('ui-p').value=''; $('ui-r').value='contador'; $('ui-pass-label').textContent='Contraseña'; }
+    $('ui-cli-wrap').style.display = $('ui-r').value==='cliente_pyme' ? '' : 'none';
+    openM('m-usr');
+  }
+  async function usrSave(){
+    const nombre=$('ui-n').value.trim(), email=$('ui-e').value.trim(), password=$('ui-p').value, rol=$('ui-r').value;
+    const cliente_id = rol==='cliente_pyme' ? ($('ui-cli').value||null) : null;
+    if(!nombre||!email){ toast('Completá nombre y email'); return; }
+    const id=$('ui-id').value;
+    if(!id && (!password || password.length<6)){ toast('Ingresá una contraseña de al menos 6 caracteres'); return; }
+    try{
+      if(id){ await api(`/api/usuarios/${id}`,'PUT', Object.assign({nombre,email,rol,cliente_id}, password?{password}:{})); }
+      else{ await api('/api/usuarios','POST',{nombre,email,password,rol,cliente_id}); }
+      closeM('m-usr'); await loadUsuarios(); renderUsuarios(); toast('Usuario guardado ✓');
+    }catch(e){ toast('Error al guardar: '+e.message); }
+  }
+  async function usrDel(id){
+    if(!confirm('¿Eliminar este usuario?')) return;
+    try{ await api(`/api/usuarios/${id}`,'DELETE'); await loadUsuarios(); renderUsuarios(); toast('Usuario eliminado'); }
+    catch(e){ toast('Error al eliminar: '+e.message); }
+  }
+  async function loadUsuarios(){
+    if(!ES_ADMIN) return;
+    try{ USUARIOS = await api('/api/usuarios'); }catch(e){ USUARIOS=[]; }
+  }
+  function renderUsuarios(){
+    const t=$('t-usr'); if(!t) return;
+    if(!USUARIOS.length){ t.innerHTML=`<tr><td colspan="5"><div class="empty"><div class="e">◎</div>Sin usuarios cargados.</div></td></tr>`; return; }
+    t.innerHTML = USUARIOS.map(u=>`<tr>
+      <td><div class="nm">${esc(u.nombre)}</div></td>
+      <td>${esc(u.email)}</td>
+      <td><span class="chip dim"><span class="dt"></span>${esc(ROL_LABEL[u.rol]||u.rol)}</span></td>
+      <td>${u.cliente_nombre?esc(u.cliente_nombre):'—'}</td>
+      <td><div class="acts"><button class="ib" data-edit-usr="${u.id}">✎</button><button class="ib d" data-del-usr="${u.id}">×</button></div></td>
+    </tr>`).join('');
+    t.querySelectorAll('[data-edit-usr]').forEach(b=>b.addEventListener('click',()=>usrModal(USUARIOS.find(x=>String(x.id)===b.dataset.editUsr))));
+    t.querySelectorAll('[data-del-usr]').forEach(b=>b.addEventListener('click',()=>usrDel(b.dataset.delUsr)));
+  }
+
   function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
 
   function renderAll(){ renderCli(); renderVen(); fillDocFilter(); renderDocs(); renderHome(); if($('v-agenda').classList.contains('on')) renderCal(); if($('v-reportes').classList.contains('on')) renderRep(); }
@@ -1009,6 +1123,9 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   $('docSave').addEventListener('click',docSave);
   $('seedBtn').addEventListener('click',seed);
   $('resetBtn').addEventListener('click',resetAll);
+  if($('addUsr')) $('addUsr').addEventListener('click',()=>usrModal());
+  if($('usrSave')) $('usrSave').addEventListener('click',usrSave);
+  if($('ui-r')) $('ui-r').addEventListener('change', e=>{ $('ui-cli-wrap').style.display = e.target.value==='cliente_pyme' ? '' : 'none'; });
   $('cfgSave').addEventListener('click',()=>toast('Configuración guardada ✓'));
   // API key del asistente (Google Gemini)
  function refreshKeyStatus(){ const el=$('key-status'); if(!el) return; el.textContent='● Conectado — el asistente responde cualquier pregunta'; el.style.color='var(--green)'; }
@@ -1065,7 +1182,7 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
     const usuario = usuarioRaw ? JSON.parse(usuarioRaw) : null;
     if (usuario) {
       $('userNombre').textContent = usuario.nombre;
-      $('userRol').textContent = usuario.rol;
+      $('userRol').textContent = ROL_LABEL[usuario.rol] || usuario.rol;
       const iniciales = usuario.nombre.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase();
       $('userAvatar').textContent = iniciales;
     }
@@ -1081,6 +1198,7 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   }
   initUserMenu();
   // ── INIT ──
+  aplicarPermisosUI();
   (async()=>{ await loadAll(); renderAll(); })();
   try{ const k=GKEY(); if(k && $('cfg-key')) $('cfg-key').value=k; }catch(e){}
   refreshKeyStatus();

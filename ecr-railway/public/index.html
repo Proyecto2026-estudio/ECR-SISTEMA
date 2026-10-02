@@ -419,7 +419,7 @@
 
       <!-- DOCS -->
       <section class="view" id="v-docs">
-        <div class="tbar"><h2>Archivo digital</h2><div class="r"><button class="btn btn-pri" id="addDoc">+ Documento</button></div></div>
+        <div class="tbar"><h2>Archivo digital</h2><div class="r"><select id="doc-filter-cli" style="padding:0.5rem 0.8rem;border-radius:6px;border:1px solid var(--line);background:var(--bg-soft);color:var(--ink);font-family:'Inter';font-size:0.82rem"></select><button class="btn btn-pri" id="addDoc">+ Documento</button></div></div>
         <div class="docs" id="g-docs"></div>
       </section>
 
@@ -774,11 +774,23 @@ async function docSave(){
     try{ await api(`/api/documentos/${id}`,'DELETE'); await loadAll(); renderAll(); }
     catch(e){ toast('Error al eliminar'); }
   }
+ function fillDocFilter(){
+  const sel=$('doc-filter-cli');
+  if(!sel) return;
+  const prev=sel.value;
+  const clientesConDoc=[...new Set(DB.docs.map(d=>String(d.cli)))];
+  const opts=DB.clientes.filter(c=>clientesConDoc.includes(String(c.id))).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  sel.innerHTML = `<option value="">Todos los clientes</option>` + opts.map(c=>`<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
+  if(prev && [...sel.options].some(o=>o.value===prev)) sel.value=prev;
+}
+
  function renderDocs(){
   const g=$('g-docs');
-  if(!DB.docs.length){ g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="e">▭</div>Sin documentos. Cargá el primero.</div>`; return; }
+  const filtro=$('doc-filter-cli')?$('doc-filter-cli').value:'';
+  const lista = filtro ? DB.docs.filter(d=>String(d.cli)===String(filtro)) : DB.docs;
+  if(!lista.length){ g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="e">▭</div>${filtro?'Este cliente no tiene documentos.':'Sin documentos. Cargá el primero.'}</div>`; return; }
   const ic={'Balance':'📊','Recibo de sueldo':'🧾','DDJJ':'📋','Factura':'🧮','Comprobante':'📑','Otro':'📁'};
-  g.innerHTML=DB.docs.map(d=>{
+  g.innerHTML=lista.map(d=>{
     const tieneArchivo = !!d.archivo_mime;
     const verBtn = tieneArchivo ? `<a href="${API_BASE}/api/documentos/${d.id}/archivo" target="_blank" rel="noopener" class="btn btn-soft btn-sm" style="margin-top:0.5rem" onclick="event.stopPropagation()">Ver archivo</a>` : `<div class="dm" style="margin-top:0.5rem;font-style:italic">Sin archivo adjunto</div>`;
     return `<div class="doc" data-del-doc="${d.id}" title="Click en la tarjeta para eliminar"><div class="di">${ic[d.tipo]||'📁'}</div><div class="dt">${esc(d.nombre)}</div><div class="dm">${esc(d.tipo)} · ${esc(cliName(d.cli))}</div><div class="dm">${new Date(d.fecha+'T00:00').toLocaleDateString('es-AR')}</div>${verBtn}</div>`;
@@ -982,7 +994,7 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
 
   function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
 
-  function renderAll(){ renderCli(); renderVen(); renderDocs(); renderHome(); if($('v-agenda').classList.contains('on')) renderCal(); if($('v-reportes').classList.contains('on')) renderRep(); }
+  function renderAll(){ renderCli(); renderVen(); fillDocFilter(); renderDocs(); renderHome(); if($('v-agenda').classList.contains('on')) renderCal(); if($('v-reportes').classList.contains('on')) renderRep(); }
 
   // ── LISTENERS ──
   $('addCli').addEventListener('click',()=>cliModal());
@@ -990,6 +1002,7 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   $('addVen').addEventListener('click',()=>venModal());
   $('venSave').addEventListener('click',venSave);
   $('addDoc').addEventListener('click',docModal);
+  $('doc-filter-cli').addEventListener('change', renderDocs);
   $('docSave').addEventListener('click',docSave);
   $('seedBtn').addEventListener('click',seed);
   $('resetBtn').addEventListener('click',resetAll);

@@ -623,8 +623,14 @@
   }
   async function api(path, method, body){
     const opts = { method: method||'GET', headers:{} };
+    try{ const tok=localStorage.getItem('ecr_token'); if(tok) opts.headers['Authorization']='Bearer '+tok; }catch(e){}
     if(body!==undefined){ opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify(body); }
     const res = await fetch(API_BASE+path, opts);
+    if(res.status===401){
+      try{ localStorage.removeItem('ecr_token'); localStorage.removeItem('ecr_usuario'); }catch(e){}
+      window.location.href = '/login.html';
+      throw new Error('Sesión expirada');
+    }
     if(!res.ok){ let msg='Error de servidor'; try{ const j=await res.json(); msg=j.error||msg; }catch(e){} throw new Error(msg); }
     if(res.status===204) return null;
     return res.json();

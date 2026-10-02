@@ -78,6 +78,14 @@ function normalizarRol(r) { return ROLES_VALIDOS.includes(r) ? r : 'contador'; }
   } catch (e) {
     if (e.code !== 'ER_DUP_FIELDNAME') console.error('Migración cliente_id:', e.message);
   }
+  // La columna 'rol' era un ENUM('admin','usuario'); se amplía a texto libre
+  // para que entren los roles nuevos (contador, cliente_pyme, lectura).
+  try {
+    await db.query("ALTER TABLE usuarios MODIFY COLUMN rol VARCHAR(30) NOT NULL DEFAULT 'contador'");
+    console.log('Migración: columna rol ampliada a VARCHAR(30)');
+  } catch (e) {
+    console.error('Migración rol:', e.code, e.message);
+  }
 })();
 
 app.post('/api/login', async (req, res) => {

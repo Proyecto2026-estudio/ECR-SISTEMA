@@ -118,7 +118,7 @@ app.post('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
     await db.query('INSERT INTO usuarios (nombre, email, password_hash, rol, cliente_id) VALUES (?,?,?,?,?)',
       [nombre, email, hash, rolFinal, rolFinal === 'cliente_pyme' ? (cliente_id || null) : null]);
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: 'No se pudo crear el usuario (¿email repetido?)' }); }
+  } catch (e) { console.error('POST /api/usuarios:', e.code, e.message); res.status(500).json({ error: 'No se pudo crear el usuario (¿email repetido?)' }); }
 });
 
 app.put('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {
@@ -136,7 +136,7 @@ app.put('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {
         [nombre, email, rolFinal, cliFinal, req.params.id]);
     }
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: 'No se pudo actualizar el usuario (¿email repetido?)' }); }
+  } catch (e) { console.error('PUT /api/usuarios/:id:', e.code, e.message); res.status(500).json({ error: 'No se pudo actualizar el usuario (¿email repetido?)' }); }
 });
 
 app.delete('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {

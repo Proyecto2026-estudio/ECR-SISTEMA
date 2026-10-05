@@ -6,14 +6,15 @@ require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
 const db      = require('./db');
-const { construirPartes } = require('./docs-extract');
+const { consultarIA } = require('./ia');
+const { registrarWhatsApp } = require('./whatsapp');
 
 const app  = express();
 app.use(express.static(require('path').join(__dirname, '..', 'public'), { index: 'login.html' }));
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '25mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 // ============================================================
 //  AUTENTICACIÓN · Login, sesiones y recuperación simple
 // ============================================================
@@ -78,6 +79,13 @@ function normalizarRol(r) { return ROLES_VALIDOS.includes(r) ? r : 'contador'; }
     console.log('Migración: columna cliente_id agregada a usuarios');
   } catch (e) {
     if (e.code !== 'ER_DUP_FIELDNAME') console.error('Migración cliente_id:', e.message);
+  }
+  // Teléfono de WhatsApp del cliente (para el asistente de WhatsApp)
+  try {
+    await db.query('ALTER TABLE clientes ADD COLUMN whatsapp VARCHAR(25) NULL');
+    console.log('Migración: columna whatsapp agregada a clientes');
+  } catch (e) {
+    if (e.code !== 'ER_DUP_FIELDNAME') console.error('Migración whatsapp:', e.message);
   }
   // La columna 'rol' era un ENUM('admin','usuario'); se amplía a texto libre
   // para que entren los roles nuevos (contador, cliente_pyme, lectura).
@@ -193,23 +201,23 @@ app.get('/api/clientes', async (req, res) => {
 });
 
 app.post('/api/clientes', async (req, res) => {
-  const { nombre, cuit, servicio, honorarios, estado } = req.body;
+  const { nombre, cuit, servicio, honorarios, estado, whatsapp } = req.body;
   if (!nombre) return res.status(400).json({ error: 'El nombre es obligatorio' });
   try {
     const [r] = await db.query(
-      'INSERT INTO clientes (nombre,cuit,servicio,honorarios,estado) VALUES (?,?,?,?,?)',
-      [nombre, cuit||null, servicio||'Asesoramiento integral', honorarios||0, estado||'Activo']
+      'INSERT INTO clientes (nombre,cuit,servicio,honorarios,estado,whatsapp) VALUES (?,?,?,?,?,?)',
+      [nombre, cuit||null, servicio||'Asesoramiento integral', honorarios||0, estado||'Activo', (whatsapp||'').replace(/[^\d+]/g,'')||null]
     );
     res.status(201).json({ ok: true, id: r.insertId });
   } catch (e) { res.status(500).json({ error: 'Error al guardar' }); }
 });
 
 app.put('/api/clientes/:id', async (req, res) => {
-  const { nombre, cuit, servicio, honorarios, estado } = req.body;
+  const { nombre, cuit, servicio, honorarios, estado, whatsapp } = req.body;
   try {
     await db.query(
-      'UPDATE clientes SET nombre=?,cuit=?,servicio=?,honorarios=?,estado=? WHERE id=?',
-      [nombre, cuit||null, servicio||'Asesoramiento integral', honorarios||0, estado||'Activo', req.params.id]
+      'UPDATE clientes SET nombre=?,cuit=?,servicio=?,honorarios=?,estado=?,whatsapp=? WHERE id=?',
+      [nombre, cuit||null, servicio||'Asesoramiento integral', honorarios||0, estado||'Activo', (whatsapp||'').replace(/[^\d+]/g,'')||null, req.params.id]
     );
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: 'Error al actualizar' }); }
@@ -323,12 +331,8 @@ app.delete('/api/documentos/:id', async (req, res) => {
 // ══════════════════════════════════════════════════════════
 app.post('/api/asistente', requireAuth, async (req, res) => {
   try {
-    const key = process.env.GEMINI_API_KEY;
-    if (!key) return res.status(500).json({ error: 'Falta configurar GEMINI_API_KEY en Railway' });
     const { prompt, system, useSearch } = req.body;
     let { clienteId } = req.body;
-    if (!prompt) return res.status(400).json({ error: 'Falta la consulta' });
-
     // Un Cliente PyME solo puede consultar la carpeta de su propio cliente.
     const [us] = await db.query('SELECT rol, cliente_id FROM usuarios WHERE id = ?', [req.usuario.id]);
     if (!us.length) return res.status(401).json({ error: 'No autorizado, iniciá sesión de nuevo' });
@@ -336,41 +340,14 @@ app.post('/api/asistente', requireAuth, async (req, res) => {
       if (!us[0].cliente_id) return res.status(403).json({ error: 'Tu usuario no tiene un cliente asociado' });
       clienteId = us[0].cliente_id;
     }
-
-    let systemText = system || '';
-    const userParts = [];
-    let docsInfo = null;
-    if (clienteId) {
-      const [cli] = await db.query('SELECT nombre FROM clientes WHERE id = ?', [clienteId]);
-      if (!cli.length) return res.status(404).json({ error: 'Cliente no encontrado' });
-      const [docs] = await db.query(
-        'SELECT nombre, tipo, fecha, archivo_data, archivo_mime, archivo_nombre_original FROM documentos WHERE cliente_id = ? ORDER BY id DESC', [clienteId]);
-      const { partes, usados, omitidos } = construirPartes(docs);
-      docsInfo = { cliente: cli[0].nombre, usados, omitidos };
-      systemText += `\n\nMODO CARPETA DE CLIENTE: estás trabajando con la carpeta de documentos de "${cli[0].nombre}". `
-        + `Basá tus respuestas en los documentos que se adjuntan en la consulta; citá de qué documento sacás cada dato. `
-        + `Si lo que preguntan no figura en los documentos, decilo en vez de inventarlo. `
-        + `Si te piden un asiento contable, proponelo con cuentas, debe y haber, aclarando que es una PROPUESTA que debe revisar el contador. `
-        + `Documentos disponibles: ${usados.length ? usados.join('; ') : '(ninguno legible)'}.`;
-      userParts.push(...partes);
-    }
-    userParts.push({ text: prompt });
-
-    const body = {
-      systemInstruction: { parts: [{ text: systemText }] },
-      contents: [{ role: 'user', parts: userParts }]
-    };
-    if (useSearch && !clienteId) body.tools = [{ google_search: {} }];
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-    });
-    if (!r.ok) { const t = await r.text(); console.error('Gemini:', r.status, t.slice(0, 300)); return res.status(r.status).json({ error: t.slice(0,200) }); }
-    const data = await r.json();
-    const parts = ((((data.candidates||[])[0]||{}).content||{}).parts)||[];
-    const text = parts.map(p=>p.text||'').join('').trim() || 'No obtuve respuesta.';
-    res.json({ text, docs: docsInfo });
-  } catch (e) { console.error('POST /api/asistente:', e.message); res.status(500).json({ error: e.message }); }
+    res.json(await consultarIA(db, { prompt, system, useSearch, clienteId }));
+  } catch (e) {
+    console.error('POST /api/asistente:', e.message);
+    res.status(e.status || 500).json({ error: e.message });
+  }
 });
+
+registrarWhatsApp(app, db);
 
 // ── Arrancar servidor ────────────────────────────────────
 app.listen(PORT, () => {

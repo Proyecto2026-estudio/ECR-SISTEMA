@@ -519,6 +519,7 @@
       <div class="fld"><label>CUIT</label><input id="ci-c" placeholder="30-12345678-9" maxlength="13" inputmode="numeric"></div>
       <div class="fld"><label>Honorarios ($/mes)</label><input id="ci-h" type="number" placeholder="45000"></div>
     </div>
+    <div class="fld"><label>WhatsApp del cliente (para el asistente)</label><input id="ci-w" placeholder="+54 9 11 5555-1234" inputmode="tel"></div>
     <div class="fld"><label>Servicio principal</label><select id="ci-s"><option>Asesoramiento integral</option><option>Sueldos + Impuestos</option><option>Contabilidad general</option><option>Monotributo</option><option>Balance + DDJJ</option></select></div>
     <div class="fld"><label>Estado</label><select id="ci-e"><option>Activo</option><option>En proceso</option><option>Inactivo</option></select></div>
   </div>
@@ -546,7 +547,7 @@
   <div class="mh"><h3>Cargar documento</h3><button class="x" data-close="m-doc">×</button></div>
   <div class="mb">
     <div class="fld"><label>Nombre del documento</label><input id="di-n" placeholder="Balance 2025 - Distribuidora"></div>
-    <div class="fld"><label>Tipo</label><select id="di-t"><option>Balance</option><option>Recibo de sueldo</option><option>DDJJ</option><option>Factura</option><option>Comprobante</option><option>Otro</option></select></div>
+    <div class="fld"><label>Tipo</label><select id="di-t"><option>Balance</option><option>Recibo de sueldo</option><option>DDJJ</option><option>Factura</option><option>Comprobante</option><option>Extracto bancario</option><option>Otro</option></select></div>
     <div class="fld"><label>Cliente asociado</label><select id="di-c"></select></div>
     <div class="fld">
   <label>Archivo</label>
@@ -645,7 +646,7 @@
       const [cli, ven, doc] = await Promise.all([
         api('/api/clientes'), api('/api/vencimientos'), api('/api/documentos')
       ]);
-      DB.clientes = cli.map(c=>({ id:String(c.id), nombre:c.nombre, cuit:c.cuit, honorarios:c.honorarios, servicio:c.servicio, estado:c.estado }));
+      DB.clientes = cli.map(c=>({ id:String(c.id), nombre:c.nombre, cuit:c.cuit, whatsapp:c.whatsapp||'', honorarios:c.honorarios, servicio:c.servicio, estado:c.estado }));
       DB.venc = ven.map(v=>({ id:String(v.id), desc:v.descripcion, cli:v.cliente_id?String(v.cliente_id):'', tipo:v.tipo, fecha:(v.fecha||'').slice(0,10), estado:v.estado }));
       DB.docs = doc.map(d=>({ id:String(d.id), nombre:d.nombre, tipo:d.tipo, cli:d.cliente_id?String(d.cliente_id):'', fecha:(d.fecha||'').slice(0,10), archivo_mime:d.archivo_mime||null }));
       aplicarAlcanceRol();
@@ -684,8 +685,8 @@
   // ── CLIENTES ──
   function cliModal(id){
     $('cliTitle').textContent = id ? 'Editar cliente' : 'Nuevo cliente';
-    if(id){ const c=DB.clientes.find(x=>x.id===id); $('ci-id').value=c.id; $('ci-n').value=c.nombre; $('ci-c').value=c.cuit||''; $('ci-h').value=c.honorarios||''; $('ci-s').value=c.servicio; $('ci-e').value=c.estado; }
-    else { $('ci-id').value=''; $('ci-n').value=''; $('ci-c').value=''; $('ci-h').value=''; $('ci-s').value='Asesoramiento integral'; $('ci-e').value='Activo'; }
+    if(id){ const c=DB.clientes.find(x=>x.id===id); $('ci-id').value=c.id; $('ci-n').value=c.nombre; $('ci-c').value=c.cuit||''; $('ci-w').value=c.whatsapp||''; $('ci-h').value=c.honorarios||''; $('ci-s').value=c.servicio; $('ci-e').value=c.estado; }
+    else { $('ci-id').value=''; $('ci-n').value=''; $('ci-c').value=''; $('ci-w').value=''; $('ci-h').value=''; $('ci-s').value='Asesoramiento integral'; $('ci-e').value='Activo'; }
     openM('m-cli');
   }
     function formatCUIT(v){
@@ -714,7 +715,7 @@
     const idActual = $('ci-id').value;
     const dup = DB.clientes.find(c => c.cuit === cuit && c.id !== idActual);
     if(cuit && dup){ toast('Ya existe un cliente cargado con ese CUIT'); return; }
-    const data = { nombre, cuit, honorarios:+$('ci-h').value||0, servicio:$('ci-s').value, estado:$('ci-e').value };
+    const data = { nombre, cuit, whatsapp:$('ci-w').value.trim(), honorarios:+$('ci-h').value||0, servicio:$('ci-s').value, estado:$('ci-e').value };
     const id = $('ci-id').value;
     try{
       if(id){ await api(`/api/clientes/${id}`,'PUT',data); } else { await api('/api/clientes','POST',data); }
@@ -866,7 +867,7 @@ async function docSave(){
   const filtro=$('doc-filter-cli')?$('doc-filter-cli').value:'';
   const lista = filtro ? DB.docs.filter(d=>String(d.cli)===String(filtro)) : DB.docs;
   if(!lista.length){ g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="e">▭</div>${filtro?'Este cliente no tiene documentos.':'Sin documentos. Cargá el primero.'}</div>`; return; }
-  const ic={'Balance':'📊','Recibo de sueldo':'🧾','DDJJ':'📋','Factura':'🧮','Comprobante':'📑','Otro':'📁'};
+  const ic={'Balance':'📊','Recibo de sueldo':'🧾','DDJJ':'📋','Factura':'🧮','Comprobante':'📑','Extracto bancario':'🏦','Otro':'📁'};
   g.innerHTML=lista.map(d=>{
     const tieneArchivo = !!d.archivo_mime;
     const verBtn = tieneArchivo ? `<a href="${API_BASE}/api/documentos/${d.id}/archivo" target="_blank" rel="noopener" class="btn btn-soft btn-sm" style="margin-top:0.5rem" onclick="event.stopPropagation()">Ver archivo</a>` : `<div class="dm" style="margin-top:0.5rem;font-style:italic">Sin archivo adjunto</div>`;

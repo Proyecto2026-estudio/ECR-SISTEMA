@@ -6,6 +6,7 @@ require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
 const db      = require('./db');
+const { construirPartes } = require('./docs-extract');
 
 const app  = express();
 app.use(express.static(require('path').join(__dirname, '..', 'public'), { index: 'login.html' }));
@@ -320,26 +321,55 @@ app.delete('/api/documentos/:id', async (req, res) => {
 // ══════════════════════════════════════════════════════════
 //  ASISTENTE (proxy a Gemini, clave guardada en el servidor)
 // ══════════════════════════════════════════════════════════
-app.post('/api/asistente', async (req, res) => {
+app.post('/api/asistente', requireAuth, async (req, res) => {
   try {
     const key = process.env.GEMINI_API_KEY;
     if (!key) return res.status(500).json({ error: 'Falta configurar GEMINI_API_KEY en Railway' });
     const { prompt, system, useSearch } = req.body;
+    let { clienteId } = req.body;
     if (!prompt) return res.status(400).json({ error: 'Falta la consulta' });
+
+    // Un Cliente PyME solo puede consultar la carpeta de su propio cliente.
+    const [us] = await db.query('SELECT rol, cliente_id FROM usuarios WHERE id = ?', [req.usuario.id]);
+    if (!us.length) return res.status(401).json({ error: 'No autorizado, iniciá sesión de nuevo' });
+    if (us[0].rol === 'cliente_pyme') {
+      if (!us[0].cliente_id) return res.status(403).json({ error: 'Tu usuario no tiene un cliente asociado' });
+      clienteId = us[0].cliente_id;
+    }
+
+    let systemText = system || '';
+    const userParts = [];
+    let docsInfo = null;
+    if (clienteId) {
+      const [cli] = await db.query('SELECT nombre FROM clientes WHERE id = ?', [clienteId]);
+      if (!cli.length) return res.status(404).json({ error: 'Cliente no encontrado' });
+      const [docs] = await db.query(
+        'SELECT nombre, tipo, fecha, archivo_data, archivo_mime, archivo_nombre_original FROM documentos WHERE cliente_id = ? ORDER BY id DESC', [clienteId]);
+      const { partes, usados, omitidos } = construirPartes(docs);
+      docsInfo = { cliente: cli[0].nombre, usados, omitidos };
+      systemText += `\n\nMODO CARPETA DE CLIENTE: estás trabajando con la carpeta de documentos de "${cli[0].nombre}". `
+        + `Basá tus respuestas en los documentos que se adjuntan en la consulta; citá de qué documento sacás cada dato. `
+        + `Si lo que preguntan no figura en los documentos, decilo en vez de inventarlo. `
+        + `Si te piden un asiento contable, proponelo con cuentas, debe y haber, aclarando que es una PROPUESTA que debe revisar el contador. `
+        + `Documentos disponibles: ${usados.length ? usados.join('; ') : '(ninguno legible)'}.`;
+      userParts.push(...partes);
+    }
+    userParts.push({ text: prompt });
+
     const body = {
-      systemInstruction: { parts: [{ text: system || '' }] },
-      contents: [{ role: 'user', parts: [{ text: prompt }] }]
+      systemInstruction: { parts: [{ text: systemText }] },
+      contents: [{ role: 'user', parts: userParts }]
     };
-    if (useSearch) body.tools = [{ google_search: {} }];
+    if (useSearch && !clienteId) body.tools = [{ google_search: {} }];
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
     });
-    if (!r.ok) { const t = await r.text(); return res.status(r.status).json({ error: t.slice(0,200) }); }
+    if (!r.ok) { const t = await r.text(); console.error('Gemini:', r.status, t.slice(0, 300)); return res.status(r.status).json({ error: t.slice(0,200) }); }
     const data = await r.json();
     const parts = ((((data.candidates||[])[0]||{}).content||{}).parts)||[];
     const text = parts.map(p=>p.text||'').join('').trim() || 'No obtuve respuesta.';
-    res.json({ text });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    res.json({ text, docs: docsInfo });
+  } catch (e) { console.error('POST /api/asistente:', e.message); res.status(500).json({ error: e.message }); }
 });
 
 // ── Arrancar servidor ────────────────────────────────────

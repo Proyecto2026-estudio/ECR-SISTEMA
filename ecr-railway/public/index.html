@@ -431,6 +431,11 @@
         <div class="panel">
           <div class="ph"><h3>✦ Asistente del estudio</h3><span class="chip gold" id="ai-mode"><span class="dt"></span>web + datos del estudio</span></div>
           <div class="pb">
+            <div class="fld" style="margin-bottom:0.9rem">
+              <label>Carpeta de cliente</label>
+              <select id="ai-cli"></select>
+              <div id="ai-cli-info" style="font-size:0.74rem;color:var(--muted);margin-top:0.3rem"></div>
+            </div>
             <div class="quick">
               <span data-q="¿Cuáles son los vencimientos de ARCA de este mes?">Vencimientos ARCA</span>
               <span data-q="Resumen de mis vencimientos cargados">Mis vencimientos</span>
@@ -944,13 +949,19 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   }
 
   // Motor 1: Google Gemini (clave gratis — funciona en cualquier hosting)
+  let ultimoDocs = null;
     async function geminiCall(q, useSearch){
+    const headers = {'Content-Type':'application/json'};
+    try{ const tok=localStorage.getItem('ecr_token'); if(tok) headers['Authorization']='Bearer '+tok; }catch(e){}
+    const clienteId = $('ai-cli') ? $('ai-cli').value : '';
     const res = await fetch(`${API_BASE}/api/asistente`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ prompt:q, system: sysPrompt(), useSearch })
+      method:'POST', headers,
+      body: JSON.stringify({ prompt:q, system: sysPrompt(), useSearch, clienteId: clienteId||null })
     });
+    if(res.status===401){ window.location.href='/login.html'; throw new Error('Sesión expirada'); }
     if(!res.ok){ const j=await res.json().catch(()=>({})); const err=new Error(j.error||('HTTP '+res.status)); err.status=res.status; throw err; }
     const data = await res.json();
+    ultimoDocs = data.docs || null;
     return data.text || 'No obtuve respuesta.';
   }
   async function askGemini(q){
@@ -994,18 +1005,26 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
     const f=$('feed');
     f.innerHTML += `<div class="bub me">${esc(q)}</div>`; i.value=''; f.scrollTop=f.scrollHeight;
     const lid='l'+uid();
-    f.innerHTML += `<div class="bub ai" id="${lid}"><span style="opacity:.7">Consultando en la web…</span></div>`;
+    const conCarpeta = !!($('ai-cli') && $('ai-cli').value);
+    f.innerHTML += `<div class="bub ai" id="${lid}"><span style="opacity:.7">${conCarpeta?'Leyendo los documentos del cliente…':'Consultando en la web…'}</span></div>`;
     f.scrollTop=f.scrollHeight;
     try{
+      ultimoDocs = null;
       const ans = await getAnswer(q);
-      $(lid).innerHTML = mdLite(ans);
+      let extra = '';
+      if(ultimoDocs){
+        const u=ultimoDocs.usados||[], o=ultimoDocs.omitidos||[];
+        extra = `<div style="font-size:0.72rem;color:var(--muted);margin-top:0.5rem;border-top:1px solid var(--line-soft);padding-top:0.4rem">Carpeta de <b>${esc(ultimoDocs.cliente)}</b> · documentos leídos: ${u.length?esc(u.join(', ')):'ninguno'}`
+          + (o.length?`<br>No se pudieron usar: ${o.map(x=>esc(x.nombre)+' ('+esc(x.motivo)+')').join(', ')}`:'') + '</div>';
+      }
+      $(lid).innerHTML = mdLite(ans) + extra;
     }catch(e){
       const noKey = !GKEY();
       const is429 = String(e.message||'').includes('429');
       let hint;
       if(noKey) hint = 'Para que el asistente responda cualquier pregunta, andá a <b>Configuración → Conectar el asistente</b> y pegá tu clave gratuita de Google Gemini.';
       else if(is429) hint = 'Llegaste al límite gratuito de Gemini por ahora (son pocas consultas por minuto/día). Esperá un minuto y reintentá; al otro día se renueva.';
-      else hint = 'No se pudo conectar. Revisá que la API key de Gemini sea correcta en <b>Configuración → Probar conexión</b>.';
+      else hint = 'No se pudo obtener la respuesta' + (e.message ? ': '+esc(e.message) : '') + '.';
       $(lid).innerHTML = replyLocal(q) + `<div style="font-size:0.72rem;color:var(--muted);margin-top:0.5rem;border-top:1px solid var(--line-soft);padding-top:0.4rem">${hint}</div>`;
     }
     f.scrollTop=f.scrollHeight;
@@ -1117,7 +1136,20 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
 
   function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
 
-  function renderAll(){ renderCli(); renderVen(); fillDocFilter(); renderDocs(); renderHome(); if($('v-agenda').classList.contains('on')) renderCal(); if($('v-reportes').classList.contains('on')) renderRep(); }
+  function fillAsistCli(){
+    const sel=$('ai-cli'); if(!sel) return;
+    const prev=sel.value;
+    sel.innerHTML = (ES_PYME?'':'<option value="">— Sin carpeta (consulta general) —</option>') + [...DB.clientes].sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(c=>`<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
+    if(prev && [...sel.options].some(o=>o.value===prev)) sel.value=prev;
+    updateAiCliInfo();
+  }
+  function updateAiCliInfo(){
+    const sel=$('ai-cli'), info=$('ai-cli-info'); if(!sel||!info) return;
+    if(!sel.value){ info.textContent='Elegí un cliente para que la IA trabaje solo con sus documentos (PDF, imágenes, Excel, CSV).'; return; }
+    const n = DB.docs.filter(d=>d.cli===sel.value).length;
+    info.textContent = n ? `${n} documento${n>1?'s':''} en la carpeta. Se envían a la IA (Gemini) solo mientras consultás.` : 'Este cliente todavía no tiene documentos cargados.';
+  }
+  function renderAll(){ renderCli(); renderVen(); fillDocFilter(); fillAsistCli(); renderDocs(); renderHome(); if($('v-agenda').classList.contains('on')) renderCal(); if($('v-reportes').classList.contains('on')) renderRep(); }
 
   // ── LISTENERS ──
   $('addCli').addEventListener('click',()=>cliModal());
@@ -1126,6 +1158,7 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   $('venSave').addEventListener('click',venSave);
   $('addDoc').addEventListener('click',docModal);
   $('doc-filter-cli').addEventListener('change', renderDocs);
+  $('ai-cli').addEventListener('change', updateAiCliInfo);
   $('docSave').addEventListener('click',docSave);
   $('seedBtn').addEventListener('click',seed);
   $('resetBtn').addEventListener('click',resetAll);

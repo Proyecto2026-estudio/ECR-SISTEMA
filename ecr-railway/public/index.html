@@ -439,6 +439,9 @@
   #doc-selbar { margin-left: auto; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
   #doc-selbar label { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600; color: var(--ink); cursor: pointer; }
   body.no-edit #doc-selbar, body.no-edit .doc-sel { display: none !important; }
+
+  body.no-edit #delSelVen, body.no-edit #venDelBtn, body.no-edit .dia-del { display: none !important; }
+  .dia-del { flex: none; }
 </style>
 </head>
 <body>
@@ -539,6 +542,7 @@
       <section class="view" id="v-agenda">
         <div class="tbar"><h2>Agenda de vencimientos</h2><div class="r">
           <div class="seg"><button class="on" id="sg-cal">Calendario</button><button id="sg-list">Lista</button></div>
+          <button class="btn btn-danger" id="delSelVen" style="display:none"><span>🗑 Eliminar seleccionados (<span id="delSelVenN">0</span>)</span></button>
           <button class="btn btn-pri" id="addVen">+ Vencimiento</button>
         </div></div>
         <div id="ag-cal">
@@ -555,7 +559,7 @@
           </div>
         </div>
         <div id="ag-list" style="display:none"><div class="panel"><table>
-          <thead><tr><th>Vencimiento</th><th>Cliente</th><th>Tipo</th><th>Fecha</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th class="selc"><input type="checkbox" id="ven-all" title="Seleccionar todos"></th><th>Vencimiento</th><th>Cliente</th><th>Tipo</th><th>Fecha</th><th>Estado</th><th></th></tr></thead>
           <tbody id="t-ven"></tbody>
         </table></div></div>
       </section>
@@ -684,7 +688,7 @@
     </div>
     <div class="fld"><label>Estado</label><select id="vi-e"><option>Pendiente</option><option>En proceso</option><option>Cumplido</option></select></div>
   </div>
-  <div class="mf"><button class="btn btn-soft" data-close="m-ven">Cancelar</button><button class="btn btn-pri" id="venSave">Guardar</button></div>
+  <div class="mf"><button class="btn btn-danger" id="venDelBtn" style="margin-right:auto;display:none">🗑 Eliminar</button><button class="btn btn-soft" data-close="m-ven">Cancelar</button><button class="btn btn-pri" id="venSave">Guardar</button></div>
 </div></div>
 
 <!-- MODAL DÍA DEL CALENDARIO -->
@@ -980,6 +984,7 @@
     $('venTitle').textContent = id ? 'Editar vencimiento' : 'Nuevo vencimiento';
     if(id){ const v=DB.venc.find(x=>x.id===id); $('vi-id').value=v.id; $('vi-d').value=v.desc; $('vi-c').value=v.cli||''; $('vi-t').value=v.tipo; $('vi-f').value=v.fecha; $('vi-e').value=v.estado; }
     else { $('vi-id').value=''; $('vi-d').value=''; $('vi-c').value=''; $('vi-t').value='Impositivo'; $('vi-f').value=preset||new Date(Date.now()+5*864e5).toISOString().slice(0,10); $('vi-e').value='Pendiente'; }
+    $('venDelBtn').style.display = (id && PUEDE_EDITAR) ? '' : 'none';
     updVenSw(); openM('m-ven');
   }
   function updVenSw(){ $('vi-sw').style.background = cliColor($('vi-c').value); $('vi-tsw').style.background = TIPO_COL[$('vi-t').value] || '#6b7280'; }
@@ -996,26 +1001,48 @@
   async function venDel(id){
     const v = DB.venc.find(x=>x.id===id);
     if(!await confirmar({ titulo:'¿Eliminar este vencimiento?', mensaje: v?`Vas a eliminar "${v.desc}". Esta acción no se puede deshacer.`:'Esta acción no se puede deshacer.', ok:'Sí, eliminar' })) return;
-    try{ await api(`/api/vencimientos/${id}`,'DELETE'); await loadAll(); renderAll(); }
-    catch(e){ toast('Error al eliminar'); }
+    try{ await api(`/api/vencimientos/${id}`,'DELETE'); SEL_VEN.delete(id); await loadAll(); renderAll(); toast('Vencimiento eliminado'); return true; }
+    catch(e){ toast('Error al eliminar'); return false; }
+  }
+  // Selección múltiple en la lista
+  const SEL_VEN = new Set();
+  function filasVisiblesVen(){ return [...document.querySelectorAll('#t-ven tr')].filter(tr=>tr.style.display!=='none' && tr.querySelector('[data-sel-ven]')); }
+  function actualizarSelVen(){
+    const n=[...SEL_VEN].filter(id=>DB.venc.some(v=>v.id===id)).length;
+    $('delSelVen').style.display = (n && PUEDE_EDITAR) ? '' : 'none';
+    $('delSelVenN').textContent = n;
+    const vis=filasVisiblesVen(), marc=vis.filter(tr=>SEL_VEN.has(tr.querySelector('[data-sel-ven]').dataset.selVen)).length;
+    $('ven-all').checked = vis.length>0 && marc===vis.length;
+    $('ven-all').indeterminate = marc>0 && marc<vis.length;
+    document.querySelectorAll('#t-ven tr').forEach(tr=>{ const cb=tr.querySelector('[data-sel-ven]'); tr.classList.toggle('is-sel', !!cb && SEL_VEN.has(cb.dataset.selVen)); });
+  }
+  async function venDelMulti(){
+    const ids=[...SEL_VEN].filter(id=>DB.venc.some(v=>v.id===id)); if(!ids.length) return;
+    if(!await confirmar({ titulo: ids.length===1?'¿Eliminar 1 vencimiento?':`¿Eliminar ${ids.length} vencimientos?`, mensaje:'Esta acción no se puede deshacer.', ok: ids.length===1?'Sí, eliminar':`Sí, eliminar ${ids.length}` })) return;
+    let fallos=0;
+    for(const id of ids){ try{ await api(`/api/vencimientos/${id}`,'DELETE'); }catch(e){ fallos++; } }
+    SEL_VEN.clear(); await loadAll(); renderAll();
+    toast(fallos?`No se pudieron eliminar ${fallos} vencimiento(s)`:(ids.length===1?'Vencimiento eliminado':`${ids.length} vencimientos eliminados`));
   }
   function renderVen(){
     const t=$('t-ven');
     const s=[...DB.venc].sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
-    if(!s.length){ t.innerHTML=`<tr><td colspan="6"><div class="empty"><div class="e">▦</div>Sin vencimientos cargados.</div></td></tr>`; return; }
+    if(!s.length){ t.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="e">▦</div>Sin vencimientos cargados.</div></td></tr>`; actualizarSelVen(); return; }
     t.innerHTML = s.map(v=>{
       const d=dleft(v.fecha); let c;
       if(v.estado==='Cumplido') c='<span class="chip ok"><span class="dt"></span>Cumplido</span>';
       else if(d<0) c='<span class="chip bad"><span class="dt"></span>Vencido</span>';
       else if(d<=7) c=`<span class="chip warn"><span class="dt"></span>En ${d}d</span>`;
       else c=`<span class="chip info"><span class="dt"></span>En ${d}d</span>`;
-      return `<tr><td><div class="nm">${esc(v.desc)}</div></td><td><span style="display:inline-flex;align-items:center;gap:0.5rem"><span class="evdot" style="--cc:${cliColor(v.cli)}"></span>${esc(cliName(v.cli))}</span></td>
+      return `<tr><td class="selc"><input type="checkbox" data-sel-ven="${v.id}" ${SEL_VEN.has(v.id)?'checked':''} aria-label="Seleccionar ${esc(v.desc)}"></td><td><div class="nm">${esc(v.desc)}</div></td><td><span style="display:inline-flex;align-items:center;gap:0.5rem"><span class="evdot" style="--cc:${cliColor(v.cli)}"></span>${esc(cliName(v.cli))}</span></td>
         <td><span class="chip tipo" style="background:${TIPO_COL[v.tipo]||'#475569'}"><span class="dt"></span>${esc(v.tipo)}</span></td>
         <td>${new Date(v.fecha+'T00:00').toLocaleDateString('es-AR')}</td><td>${c}</td>
         <td><div class="acts"><button class="ib" data-edit-ven="${v.id}">✎</button><button class="ib d" data-del-ven="${v.id}">×</button></div></td></tr>`;
     }).join('');
     t.querySelectorAll('[data-edit-ven]').forEach(b=>b.addEventListener('click',()=>venModal(b.dataset.editVen)));
     t.querySelectorAll('[data-del-ven]').forEach(b=>b.addEventListener('click',()=>venDel(b.dataset.delVen)));
+    t.querySelectorAll('[data-sel-ven]').forEach(cb=>cb.addEventListener('change',()=>{ if(cb.checked) SEL_VEN.add(cb.dataset.selVen); else SEL_VEN.delete(cb.dataset.selVen); actualizarSelVen(); }));
+    actualizarSelVen();
   }
 
   // ── CALENDARIO ──
@@ -1072,9 +1099,10 @@
         <span class="dia-bar" style="background:${TIPO_COL[v.tipo]||'#475569'}"></span>
         <span class="evdot big" style="--cc:${cliColor(v.cli)}"></span>
         <div class="lm"><div class="t">${esc(v.desc)}</div><div class="s">${esc(cliName(v.cli))} · ${esc(v.tipo)} · ${esc(v.estado)}</div></div>
-        <button class="ib" title="Editar">✎</button></div>`).join('')
+        <button class="ib" title="Editar">✎</button><button class="ib d dia-del" title="Eliminar" data-dia-del="${v.id}">🗑</button></div>`).join('')
       : '<div class="empty"><div class="e">▦</div>No hay vencimientos este día.</div>';
     $('dia-b').querySelectorAll('[data-dia-ev]').forEach(r=>r.addEventListener('click',()=>{ closeM('m-dia'); venModal(r.dataset.diaEv); }));
+    $('dia-b').querySelectorAll('[data-dia-del]').forEach(b=>b.addEventListener('click',async e=>{ e.stopPropagation(); await venDel(b.dataset.diaDel); if(diaActual) diaModal(diaActual); }));
     $('dia-add').style.display = PUEDE_EDITAR ? '' : 'none';
     openM('m-dia');
   }
@@ -1499,6 +1527,9 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   $('cli-all').addEventListener('change',e=>{ filasVisiblesCli().forEach(tr=>{ const id=tr.querySelector('[data-sel-cli]').dataset.selCli; if(e.target.checked) SEL_CLI.add(id); else SEL_CLI.delete(id); tr.querySelector('[data-sel-cli]').checked=e.target.checked; }); actualizarSel(); });
   $('cliSave').addEventListener('click',cliSave);
   $('addVen').addEventListener('click',()=>venModal());
+  $('delSelVen').addEventListener('click',venDelMulti);
+  $('ven-all').addEventListener('change',e=>{ filasVisiblesVen().forEach(tr=>{ const cb=tr.querySelector('[data-sel-ven]'); cb.checked=e.target.checked; if(e.target.checked) SEL_VEN.add(cb.dataset.selVen); else SEL_VEN.delete(cb.dataset.selVen); }); actualizarSelVen(); });
+  $('venDelBtn').addEventListener('click',async()=>{ const id=$('vi-id').value; if(!id) return; closeM('m-ven'); const ok=await venDel(id); if(!ok) openM('m-ven'); });
   $('venSave').addEventListener('click',venSave);
   $('addDoc').addEventListener('click',docModal);
   $('doc-q').addEventListener('input', renderDocs);
@@ -1542,7 +1573,7 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   $('search').addEventListener('input',e=>{
     const q=e.target.value.toLowerCase();
     document.querySelectorAll('#t-cli tr, #t-ven tr').forEach(tr=>{ if(tr.querySelector('.empty')) return; tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none'; });
-    actualizarSel();
+    actualizarSel(); actualizarSelVen();
   });
 
   // ── TICKER DÓLAR (dolarapi.com — gratis, sin clave) ──

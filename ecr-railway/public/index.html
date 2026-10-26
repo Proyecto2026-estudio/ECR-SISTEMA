@@ -389,6 +389,21 @@
   .chip.tipo { color: #fff; border-color: transparent; }
   .chip.tipo .dt { background: #fff !important; }
   .modal.wide { width: 560px; }
+
+  /* ─── Documentos por carpeta de cliente ─── */
+  .lupa { position: relative; }
+  .lupa input { width: 300px; max-width: 100%; padding: 0.62rem 0.9rem 0.62rem 2.4rem; border: 1.5px solid #9d9580; border-radius: 8px; background: #fff; color: var(--ink); font-family: 'Inter'; font-size: 0.95rem; }
+  .lupa input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
+  .lupa .lp { position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); font-size: 1rem; pointer-events: none; }
+  .folder { position: relative; }
+  .folder .di { font-size: 2.2rem; }
+  .folder .dt { font-size: 1rem; }
+  .folder .cnt { position: absolute; top: 0.8rem; right: 0.8rem; background: var(--navy); color: #fff; font-weight: 700; font-size: 0.8rem; min-width: 28px; height: 28px; padding: 0 0.5rem; border-radius: 14px; display: flex; align-items: center; justify-content: center; }
+  .docs-back { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.2rem; }
+  .docs-back h3 { font-size: 1.2rem; }
+  .doc .doc-acts { display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
+  .doc { cursor: default; }
+  .doc.folder { cursor: pointer; }
 </style>
 </head>
 <body>
@@ -512,7 +527,8 @@
 
       <!-- DOCS -->
       <section class="view" id="v-docs">
-        <div class="tbar"><h2>Archivo digital</h2><div class="r"><select id="doc-filter-cli" style="padding:0.5rem 0.8rem;border-radius:6px;border:1px solid var(--line);background:var(--bg-soft);color:var(--ink);font-family:'Inter';font-size:0.82rem"></select><button class="btn btn-pri" id="addDoc">+ Documento</button></div></div>
+        <div class="tbar"><h2>Archivo digital</h2><div class="r"><div class="lupa"><span class="lp">🔍</span><input id="doc-q" type="search" placeholder="Buscar cliente o documento…" autocomplete="off"></div><button class="btn btn-pri" id="addDoc">+ Documento</button></div></div>
+        <div class="docs-back" id="docs-back" style="display:none"><button class="btn btn-soft" id="doc-back">← Todos los clientes</button><h3 id="doc-cli-t"></h3></div>
         <div class="docs" id="g-docs"></div>
       </section>
 
@@ -1057,30 +1073,51 @@ async function docSave(){
     try{ await api(`/api/documentos/${id}`,'DELETE'); await loadAll(); renderAll(); }
     catch(e){ toast('Error al eliminar'); }
   }
- function fillDocFilter(){
-  const sel=$('doc-filter-cli');
-  if(!sel) return;
-  const prev=sel.value;
-  const clientesConDoc=[...new Set(DB.docs.map(d=>String(d.cli)))];
-  const opts=DB.clientes.filter(c=>clientesConDoc.includes(String(c.id))).sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  sel.innerHTML = `<option value="">Todos los clientes</option>` + opts.map(c=>`<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
-  if(prev && [...sel.options].some(o=>o.value===prev)) sel.value=prev;
-}
+  // Carpetas por cliente: cada cliente aparece UNA vez; al entrar se ven todos sus archivos.
+  let DOC_CLI = null;   // null = lista de carpetas; '' = documentos generales; id = carpeta de ese cliente
+  const norm = t => String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  function renderDocs(){
+    const g=$('g-docs'), q=norm($('doc-q').value.trim());
+    const ic={'Balance':'📊','Recibo de sueldo':'🧾','DDJJ':'📋','Factura':'🧮','Comprobante':'📑','Extracto bancario':'🏦','Otro':'📁'};
+    // agrupar por cliente
+    const grupos = new Map();
+    DB.docs.forEach(d=>{ const k=d.cli||''; if(!grupos.has(k)) grupos.set(k,[]); grupos.get(k).push(d); });
+    if(DOC_CLI!==null && !grupos.has(DOC_CLI)) DOC_CLI = null;
+    if(DOC_CLI===null && ES_PYME && grupos.size===1 && !q) DOC_CLI = [...grupos.keys()][0];
+    $('docs-back').style.display = DOC_CLI===null ? 'none' : 'flex';
 
- function renderDocs(){
-  const g=$('g-docs');
-  const filtro=$('doc-filter-cli')?$('doc-filter-cli').value:'';
-  const lista = filtro ? DB.docs.filter(d=>String(d.cli)===String(filtro)) : DB.docs;
-  if(!lista.length){ g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="e">▭</div>${filtro?'Este cliente no tiene documentos.':'Sin documentos. Cargá el primero.'}</div>`; return; }
-  const ic={'Balance':'📊','Recibo de sueldo':'🧾','DDJJ':'📋','Factura':'🧮','Comprobante':'📑','Extracto bancario':'🏦','Otro':'📁'};
-  g.innerHTML=lista.map(d=>{
-    const tieneArchivo = !!d.archivo_mime;
-    const verBtn = tieneArchivo ? `<a href="${API_BASE}/api/documentos/${d.id}/archivo" target="_blank" rel="noopener" class="btn btn-soft btn-sm" style="margin-top:0.5rem" onclick="event.stopPropagation()">Ver archivo</a>` : `<div class="dm" style="margin-top:0.5rem;font-style:italic">Sin archivo adjunto</div>`;
-    const titleAttr = PUEDE_EDITAR ? ' title="Click en la tarjeta para eliminar"' : '';
-    return `<div class="doc" data-del-doc="${d.id}"${titleAttr}><div class="di">${ic[d.tipo]||'📁'}</div><div class="dt">${esc(d.nombre)}</div><div class="dm">${esc(d.tipo)} · ${esc(cliName(d.cli))}</div><div class="dm">${new Date(d.fecha+'T00:00').toLocaleDateString('es-AR')}</div>${verBtn}</div>`;
-  }).join('');
-  if(PUEDE_EDITAR) g.querySelectorAll('[data-del-doc]').forEach(b=>b.addEventListener('click',()=>docDel(b.dataset.delDoc)));
-}
+    if(DOC_CLI===null){
+      // ── vista de carpetas ──
+      let carpetas=[...grupos.entries()].map(([k,ds])=>({ k, nombre: cliName(k), ds }));
+      if(q) carpetas = carpetas.filter(c=>norm(c.nombre).includes(q) || c.ds.some(d=>norm(d.nombre).includes(q) || norm(d.tipo).includes(q)));
+      carpetas.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+      if(!carpetas.length){ g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="e">▭</div>${q?'No se encontró ningún cliente ni documento con esa búsqueda.':'Sin documentos. Cargá el primero.'}</div>`; return; }
+      g.innerHTML = carpetas.map(c=>{
+        const ult = c.ds.map(d=>d.fecha).sort().pop();
+        const coin = q ? c.ds.filter(d=>norm(d.nombre).includes(q)||norm(d.tipo).includes(q)).length : 0;
+        const nota = (q && coin && !norm(c.nombre).includes(q)) ? `<div class="dm" style="color:var(--gold);font-weight:600">${coin} documento${coin>1?'s':''} coincide${coin>1?'n':''}</div>` : '';
+        return `<div class="doc folder" data-carpeta="${esc(c.k)}" tabindex="0" role="button" aria-label="Abrir carpeta de ${esc(c.nombre)}"><span class="cnt">${c.ds.length}</span><div class="di">📁</div><div class="dt">${esc(c.nombre)}</div><div class="dm">${c.ds.length} documento${c.ds.length>1?'s':''}</div><div class="dm">Último: ${new Date(ult+'T00:00').toLocaleDateString('es-AR')}</div>${nota}</div>`;
+      }).join('');
+      g.querySelectorAll('[data-carpeta]').forEach(el=>{
+        const abrir=()=>{ DOC_CLI=el.dataset.carpeta; $('doc-q').value=''; renderDocs(); };
+        el.addEventListener('click',abrir);
+        el.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); abrir(); } });
+      });
+      return;
+    }
+
+    // ── vista de archivos de un cliente ──
+    $('doc-cli-t').textContent = '📁 ' + cliName(DOC_CLI);
+    let lista = (grupos.get(DOC_CLI)||[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)) || (+b.id)-(+a.id));
+    if(q) lista = lista.filter(d=>norm(d.nombre).includes(q)||norm(d.tipo).includes(q));
+    if(!lista.length){ g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="e">▭</div>Ningún documento coincide con la búsqueda.</div>`; return; }
+    g.innerHTML = lista.map(d=>{
+      const ver = d.archivo_mime ? `<a href="${API_BASE}/api/documentos/${d.id}/archivo" target="_blank" rel="noopener" class="btn btn-soft btn-sm">Ver archivo</a>` : `<span class="dm" style="font-style:italic">Sin archivo adjunto</span>`;
+      const del = PUEDE_EDITAR ? `<button class="btn btn-soft btn-sm" style="color:var(--red);border-color:var(--red)" data-del-doc="${d.id}">Eliminar</button>` : '';
+      return `<div class="doc"><div class="di">${ic[d.tipo]||'📁'}</div><div class="dt">${esc(d.nombre)}</div><div class="dm">${esc(d.tipo)}</div><div class="dm">${new Date(d.fecha+'T00:00').toLocaleDateString('es-AR')}</div><div class="doc-acts">${ver}${del}</div></div>`;
+    }).join('');
+    g.querySelectorAll('[data-del-doc]').forEach(b=>b.addEventListener('click',()=>docDel(b.dataset.delDoc)));
+  }
 
   // ── INICIO ──
   function renderHome(){
@@ -1356,7 +1393,7 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
     const n = DB.docs.filter(d=>d.cli===sel.value).length;
     info.textContent = n ? `${n} documento${n>1?'s':''} en la carpeta. Se envían a la IA (Gemini) solo mientras consultás.` : 'Este cliente todavía no tiene documentos cargados.';
   }
-  function renderAll(){ renderCli(); renderVen(); fillDocFilter(); fillAsistCli(); renderDocs(); renderHome(); if($('v-agenda').classList.contains('on')) renderCal(); if($('v-reportes').classList.contains('on')) renderRep(); }
+  function renderAll(){ renderCli(); renderVen(); fillAsistCli(); renderDocs(); renderHome(); if($('v-agenda').classList.contains('on')) renderCal(); if($('v-reportes').classList.contains('on')) renderRep(); }
 
   // ── LISTENERS ──
   $('addCli').addEventListener('click',()=>cliModal());
@@ -1366,7 +1403,8 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   $('addVen').addEventListener('click',()=>venModal());
   $('venSave').addEventListener('click',venSave);
   $('addDoc').addEventListener('click',docModal);
-  $('doc-filter-cli').addEventListener('change', renderDocs);
+  $('doc-q').addEventListener('input', renderDocs);
+  $('doc-back').addEventListener('click',()=>{ DOC_CLI=null; $('doc-q').value=''; renderDocs(); });
   $('ai-cli').addEventListener('change', updateAiCliInfo);
   $('docSave').addEventListener('click',docSave);
   $('seedBtn').addEventListener('click',seed);

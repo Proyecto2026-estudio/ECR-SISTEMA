@@ -458,7 +458,7 @@
       <div class="menu-cap">Herramientas</div>
       <div class="menu-i" data-v="asistente"><span class="mi">✦</span> Asistente</div>
       <div class="menu-i" data-v="reportes"><span class="mi">▥</span> Reportes</div>
-      <div class="menu-cap">Sistema</div>
+      <div class="menu-cap" id="cap-sistema">Sistema</div>
       <div class="menu-i" data-v="usuarios"><span class="mi">◎</span> Usuarios</div>
       <div class="menu-i" data-v="ajustes"><span class="mi">⚙</span> Configuración</div>
     </nav>
@@ -778,6 +778,7 @@
     (NAV_OCULTO[ROL]||NAV_OCULTO.contador).forEach(v=>{
       const el=document.querySelector(`.menu-i[data-v="${v}"]`); if(el) el.style.display='none';
     });
+    if(!ES_ADMIN && $('cap-sistema')) $('cap-sistema').style.display='none';   // el apartado Sistema es solo del administrador
     const activo=document.querySelector('.menu-i.on');
     if(activo && activo.style.display==='none') nav('agenda');
   }
@@ -824,6 +825,7 @@
   // ── NAVEGACIÓN ──
   const titles = { inicio:['Panel general','Resumen del estudio'], clientes:['Clientes','Cartera del estudio'], agenda:['Agenda de vencimientos','Calendario impositivo y laboral'], docs:['Archivo digital','Documentos del estudio'], asistente:['Asistente','Consultas del estudio'], reportes:['Reportes','Métricas y análisis'], ajustes:['Configuración','Ajustes del sistema'], usuarios:['Usuarios del sistema','Accesos y roles'] };
   function nav(v){
+    if(!ES_ADMIN && (v==='usuarios'||v==='ajustes')) v = 'agenda';
     document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));
     $('v-'+v).classList.add('on');
     document.querySelectorAll('.menu-i').forEach(b=>b.classList.toggle('on', b.dataset.v===v));

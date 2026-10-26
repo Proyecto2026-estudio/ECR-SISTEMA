@@ -529,7 +529,6 @@
       <section class="view" id="v-clientes">
         <div class="tbar"><h2>Cartera de clientes</h2><div class="r">
           <button class="btn btn-danger" id="delSel" style="display:none"><span>🗑 Eliminar seleccionados (<span id="delSelN">0</span>)</span></button>
-          <button class="btn btn-soft" id="seedBtn">Cargar datos demo</button>
           <button class="btn btn-pri" id="addCli">+ Cliente</button>
         </div></div>
         <div class="panel"><table>
@@ -963,7 +962,7 @@
   function renderCli(){
     const t=$('t-cli');
     [...SEL_CLI].forEach(id=>{ if(!DB.clientes.some(c=>c.id===id)) SEL_CLI.delete(id); });
-    if(!DB.clientes.length){ t.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="e">▤</div>Sin clientes cargados. Agregá el primero o cargá datos demo.</div></td></tr>`; actualizarSel(); return; }
+    if(!DB.clientes.length){ t.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="e">▤</div>Sin clientes cargados. Agregá el primero con el botón "+ Cliente".</div></td></tr>`; actualizarSel(); return; }
     t.innerHTML = DB.clientes.map(c=>`<tr>
       <td class="selc"><input type="checkbox" data-sel-cli="${c.id}" ${SEL_CLI.has(c.id)?'checked':''} aria-label="Seleccionar ${esc(c.nombre)}"></td>
       <td><div class="nm">${esc(c.nombre)}</div></td>
@@ -1414,38 +1413,6 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   }
 
   // ── DATOS DEMO ──
-  async function seed(){
-    try{
-      const clientesDemo=[
-        {nombre:'Distribuidora del Oeste S.A.',cuit:'30-71234567-8',honorarios:85000,servicio:'Asesoramiento integral',estado:'Activo'},
-        {nombre:'Panadería La Esquina SRL',cuit:'30-69876543-2',honorarios:42000,servicio:'Sueldos + Impuestos',estado:'Activo'},
-        {nombre:'Carlos Méndez',cuit:'20-28456789-3',honorarios:18000,servicio:'Monotributo',estado:'Activo'},
-        {nombre:'Talleres Industriales TF',cuit:'30-70112233-4',honorarios:95000,servicio:'Balance + DDJJ',estado:'Activo'},
-        {nombre:'Ferretería Central',cuit:'30-65998877-1',honorarios:38000,servicio:'Contabilidad general',estado:'En proceso'},
-      ];
-      const ids=[];
-      for(const c of clientesDemo){ const r=await api('/api/clientes','POST',c); ids.push(r.id); }
-      const td=new Date(), dp=n=>new Date(td.getTime()+n*864e5).toISOString().slice(0,10);
-      const vencDemo=[
-        {descripcion:'Presentación IVA',cliente_id:ids[0],tipo:'Impositivo',fecha:dp(3),estado:'Pendiente'},
-        {descripcion:'Cargas sociales (F.931)',cliente_id:ids[1],tipo:'Previsional',fecha:dp(6),estado:'Pendiente'},
-        {descripcion:'Recategorización Monotributo',cliente_id:ids[2],tipo:'Impositivo',fecha:dp(12),estado:'Pendiente'},
-        {descripcion:'Anticipo Ganancias',cliente_id:ids[3],tipo:'Impositivo',fecha:dp(-2),estado:'Pendiente'},
-        {descripcion:'Sueldos del mes',cliente_id:ids[1],tipo:'Laboral',fecha:dp(1),estado:'En proceso'},
-        {descripcion:'Acta asamblea anual',cliente_id:ids[0],tipo:'Societario',fecha:dp(18),estado:'Pendiente'},
-        {descripcion:'IIBB Convenio Multilateral',cliente_id:ids[3],tipo:'Impositivo',fecha:dp(9),estado:'Pendiente'},
-      ];
-      for(const v of vencDemo){ await api('/api/vencimientos','POST',v); }
-      const docsDemo=[
-        {nombre:'Balance 2024 - Distribuidora',tipo:'Balance',cliente_id:ids[0],fecha:dp(-30)},
-        {nombre:'Recibos Sept - Panadería',tipo:'Recibo de sueldo',cliente_id:ids[1],fecha:dp(-10)},
-        {nombre:'DDJJ IVA Sept - Talleres',tipo:'DDJJ',cliente_id:ids[3],fecha:dp(-5)},
-        {nombre:'Factura honorarios - Ferretería',tipo:'Factura',cliente_id:ids[4],fecha:dp(-2)},
-      ];
-      for(const d of docsDemo){ await api('/api/documentos','POST',d); }
-      await loadAll(); renderAll(); toast('Datos demo cargados ✓');
-    }catch(e){ toast('Error al cargar datos demo'); }
-  }
   async function resetAll(){
     if(!await confirmar({ titulo:'¿Reiniciar todos los datos?', mensaje:'Se van a borrar TODOS los clientes, vencimientos y documentos del sistema. Esta acción no se puede deshacer.', ok:'Sí, borrar todo' })) return;
     try{
@@ -1538,7 +1505,6 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   $('doc-back').addEventListener('click',()=>{ SEL_DOC.clear(); DOC_CLI=null; $('doc-q').value=''; renderDocs(); });
   $('ai-cli').addEventListener('change', updateAiCliInfo);
   $('docSave').addEventListener('click',docSave);
-  $('seedBtn').addEventListener('click',seed);
   $('resetBtn').addEventListener('click',resetAll);
   if($('addUsr')) $('addUsr').addEventListener('click',()=>usrModal());
   if($('usrSave')) $('usrSave').addEventListener('click',usrSave);

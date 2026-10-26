@@ -303,6 +303,56 @@
   .user-dropdown.open { display:block; }
   .user-dropdown button { width:100%; padding:0.7rem 1rem; background:none; border:none; text-align:left; cursor:pointer; font-size:0.9rem; color:#c0392b; }
   .user-dropdown button:hover { background:#faf9f6; }
+
+  /* ─── ACCESIBILIDAD: más contraste y tamaño (pensado para personas mayores) ─── */
+  :root {
+    --ink: #101521; --ink-2: #2b3240; --muted: #5a5546;
+    --line: #cfc8b6; --line-soft: #ddd7c8;
+    --gold: #8f6a14; --gold-2: #b08d3c; --gold-soft: #f1e2b8;
+    --green: #14633a; --green-soft: #c9e8d4;
+    --amber: #8a4b00; --amber-soft: #fbdcab;
+    --red: #a11d1d; --red-soft: #f6c9c9;
+    --blue: #124a99; --blue-soft: #c7dbf6;
+  }
+  body { font-size: 15px; }
+  .btn { font-size: 0.9rem; padding: 0.65rem 1.15rem; }
+  .btn-sm { font-size: 0.82rem; padding: 0.45rem 0.8rem; }
+  .btn-soft { border: 1.5px solid #9d9580; color: var(--ink); }
+  .btn-gold { background: #8f6a14; }
+  .btn-danger { background: #b42318; color: #fff; }
+  .btn-danger:hover { background: #8f1b11; }
+  .btn-lg { font-size: 1rem; padding: 0.8rem 1.5rem; }
+  thead th { font-size: 0.74rem; color: var(--ink-2); background: #ebe6d8; border-bottom: 2px solid #bdb59f; }
+  tbody td { color: var(--ink); font-size: 0.92rem; border-bottom: 1px solid var(--line); }
+  .chip { font-size: 0.78rem; padding: 0.28rem 0.7rem; border: 1px solid transparent; }
+  .chip.ok { background: var(--green-soft); border-color: #7fbf98; }
+  .chip.warn { background: var(--amber-soft); border-color: #e0a95a; }
+  .chip.bad { background: var(--red-soft); border-color: #e08f8f; }
+  .chip.info { background: var(--blue-soft); border-color: #8fb3e6; }
+  .chip.dim { background: #e4dfd1; color: var(--ink-2); border-color: #bdb59f; }
+  .ib { width: 36px; height: 36px; font-size: 0.95rem; border: 1.5px solid #9d9580; color: var(--ink); }
+  .ib.d { color: var(--red); border-color: #d99; }
+  .ib.d:hover { background: var(--red); color: #fff; border-color: var(--red); }
+  .menu-i { font-size: 0.95rem; color: #e3e8f1; }
+  .nm { font-size: 0.95rem; }
+  .fld label { font-size: 0.82rem; color: var(--ink); }
+  .fld input, .fld select { font-size: 0.92rem; border: 1.5px solid #9d9580; }
+  .metric .lbl { color: var(--ink-2); }
+
+  /* ─── Selección múltiple en clientes ─── */
+  .selc { width: 46px; text-align: center; padding-left: 0.6rem !important; padding-right: 0.6rem !important; }
+  .selc input { width: 20px; height: 20px; cursor: pointer; accent-color: #8f6a14; }
+  body.no-edit .selc, body.no-edit #delSel { display: none !important; }
+  tr.is-sel { background: #f6ecd0 !important; }
+
+  /* ─── Cartel de confirmación ─── */
+  .modal.confirm { width: 440px; padding: 2rem 1.8rem 1.6rem; text-align: center; }
+  .conf-ic { width: 68px; height: 68px; border-radius: 50%; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 700; background: var(--red-soft); color: var(--red); border: 3px solid #e08f8f; }
+  .conf-ic.info { background: var(--blue-soft); color: var(--blue); border-color: #8fb3e6; }
+  .modal.confirm h3 { font-size: 1.3rem; margin-bottom: 0.6rem; }
+  .modal.confirm p { color: var(--ink-2); font-size: 1rem; line-height: 1.55; margin-bottom: 1.5rem; }
+  .conf-btns { display: flex; gap: 0.8rem; justify-content: center; }
+  .conf-btns .btn { flex: 1; justify-content: center; }
 </style>
 </head>
 <body>
@@ -389,11 +439,12 @@
       <!-- CLIENTES -->
       <section class="view" id="v-clientes">
         <div class="tbar"><h2>Cartera de clientes</h2><div class="r">
+          <button class="btn btn-danger" id="delSel" style="display:none"><span>🗑 Eliminar seleccionados (<span id="delSelN">0</span>)</span></button>
           <button class="btn btn-soft" id="seedBtn">Cargar datos demo</button>
           <button class="btn btn-pri" id="addCli">+ Cliente</button>
         </div></div>
         <div class="panel"><table>
-          <thead><tr><th>Empresa</th><th>CUIT</th><th>Servicio</th><th>Honorarios</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th class="selc"><input type="checkbox" id="cli-all" title="Seleccionar todos"></th><th>Empresa</th><th>CUIT</th><th>Servicio</th><th>Honorarios</th><th>Estado</th><th></th></tr></thead>
           <tbody id="t-cli"></tbody>
         </table></div>
       </section>
@@ -580,6 +631,17 @@
   <div class="mf"><button class="btn btn-soft" data-close="m-usr">Cancelar</button><button class="btn btn-pri" id="usrSave">Guardar usuario</button></div>
 </div></div>
 
+<!-- MODAL CONFIRMAR (cartel reutilizable) -->
+<div class="ov" id="m-conf"><div class="modal confirm" role="alertdialog" aria-labelledby="conf-t" aria-describedby="conf-m">
+  <div class="conf-ic" id="conf-ic">!</div>
+  <h3 id="conf-t">¿Estás seguro?</h3>
+  <p id="conf-m"></p>
+  <div class="conf-btns">
+    <button class="btn btn-soft btn-lg" id="conf-no">Cancelar</button>
+    <button class="btn btn-danger btn-lg" id="conf-ok">Eliminar</button>
+  </div>
+</div></div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -675,6 +737,29 @@
     if(v==='agenda') venModal(); else if(v==='docs') docModal(); else cliModal();
   });
 
+  // ── CARTEL DE CONFIRMACIÓN (el diseño está en el HTML: #m-conf) ──
+  let _confRes = null;
+  function confirmar(o){
+    return new Promise(res=>{
+      if(_confRes) _confRes(false);
+      _confRes = res;
+      $('conf-t').textContent = o.titulo || '¿Estás seguro?';
+      $('conf-m').textContent = o.mensaje || '';
+      $('conf-ok').textContent = o.ok || 'Eliminar';
+      const peligro = o.peligro !== false;
+      $('conf-ic').textContent = peligro ? '!' : '?';
+      $('conf-ic').classList.toggle('info', !peligro);
+      $('conf-ok').className = 'btn btn-lg ' + (peligro ? 'btn-danger' : 'btn-pri');
+      $('m-conf').classList.add('open');
+      setTimeout(()=>$('conf-no').focus(), 30);
+    });
+  }
+  function cerrarConf(v){ $('m-conf').classList.remove('open'); const r=_confRes; _confRes=null; if(r) r(v); }
+  $('conf-ok').addEventListener('click',()=>cerrarConf(true));
+  $('conf-no').addEventListener('click',()=>cerrarConf(false));
+  $('m-conf').addEventListener('click',e=>{ if(e.target===$('m-conf')) cerrarConf(false); });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape' && $('m-conf').classList.contains('open')) cerrarConf(false); });
+
   // ── MODALES ──
   function openM(id){ $(id).classList.add('open'); }
   function closeM(id){ $(id).classList.remove('open'); }
@@ -723,15 +808,46 @@
     }catch(e){ toast('Error al guardar: '+e.message); }
   }
   async function cliDel(id){
-    if(!confirm('¿Eliminar este cliente?')) return;
-    try{ await api(`/api/clientes/${id}`,'DELETE'); await loadAll(); renderAll(); toast('Cliente eliminado'); }
+    const c = DB.clientes.find(x=>x.id===id);
+    const ok = await confirmar({ titulo:'¿Eliminar este cliente?', mensaje: (c?`Vas a eliminar a "${c.nombre}". `:'') + 'Sus vencimientos y documentos quedan guardados como "General del estudio". Esta acción no se puede deshacer.', ok:'Sí, eliminar' });
+    if(!ok) return;
+    try{ await api(`/api/clientes/${id}`,'DELETE'); SEL_CLI.delete(id); await loadAll(); renderAll(); toast('Cliente eliminado'); }
     catch(e){ toast('Error al eliminar'); }
+  }
+  // Selección múltiple
+  const SEL_CLI = new Set();
+  function filasVisiblesCli(){ return [...document.querySelectorAll('#t-cli tr')].filter(tr=>tr.style.display!=='none' && tr.querySelector('[data-sel-cli]')); }
+  function actualizarSel(){
+    const n = SEL_CLI.size;
+    $('delSel').style.display = (n && PUEDE_EDITAR) ? '' : 'none';
+    $('delSelN').textContent = n;
+    const vis = filasVisiblesCli();
+    const marcadas = vis.filter(tr=>SEL_CLI.has(tr.querySelector('[data-sel-cli]').dataset.selCli)).length;
+    const all = $('cli-all');
+    all.checked = vis.length>0 && marcadas===vis.length;
+    all.indeterminate = marcadas>0 && marcadas<vis.length;
+    document.querySelectorAll('#t-cli tr').forEach(tr=>{ const cb=tr.querySelector('[data-sel-cli]'); tr.classList.toggle('is-sel', !!cb && SEL_CLI.has(cb.dataset.selCli)); });
+  }
+  async function cliDelMulti(){
+    const ids=[...SEL_CLI]; if(!ids.length) return;
+    const ok = await confirmar({
+      titulo: ids.length===1 ? '¿Eliminar 1 cliente?' : `¿Eliminar ${ids.length} clientes?`,
+      mensaje: 'Sus vencimientos y documentos quedan guardados como "General del estudio". Esta acción no se puede deshacer.',
+      ok: ids.length===1 ? 'Sí, eliminar' : `Sí, eliminar ${ids.length}`
+    });
+    if(!ok) return;
+    let fallos=0;
+    for(const id of ids){ try{ await api(`/api/clientes/${id}`,'DELETE'); }catch(e){ fallos++; } }
+    SEL_CLI.clear(); await loadAll(); renderAll();
+    toast(fallos ? `No se pudieron eliminar ${fallos} cliente(s)` : (ids.length===1?'Cliente eliminado':`${ids.length} clientes eliminados`));
   }
   function estChip(e){ const m={'Activo':'ok','En proceso':'warn','Inactivo':'dim'}; return `<span class="chip ${m[e]||'dim'}"><span class="dt"></span>${e}</span>`; }
   function renderCli(){
     const t=$('t-cli');
-    if(!DB.clientes.length){ t.innerHTML=`<tr><td colspan="6"><div class="empty"><div class="e">▤</div>Sin clientes cargados. Agregá el primero o cargá datos demo.</div></td></tr>`; return; }
+    [...SEL_CLI].forEach(id=>{ if(!DB.clientes.some(c=>c.id===id)) SEL_CLI.delete(id); });
+    if(!DB.clientes.length){ t.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="e">▤</div>Sin clientes cargados. Agregá el primero o cargá datos demo.</div></td></tr>`; actualizarSel(); return; }
     t.innerHTML = DB.clientes.map(c=>`<tr>
+      <td class="selc"><input type="checkbox" data-sel-cli="${c.id}" ${SEL_CLI.has(c.id)?'checked':''} aria-label="Seleccionar ${esc(c.nombre)}"></td>
       <td><div class="nm">${esc(c.nombre)}</div></td>
       <td><span class="mono">${esc(c.cuit||'—')}</span></td>
       <td>${esc(c.servicio)}</td><td><strong>${money(c.honorarios)}</strong></td>
@@ -740,6 +856,8 @@
     </tr>`).join('');
     t.querySelectorAll('[data-edit-cli]').forEach(b=>b.addEventListener('click',()=>cliModal(b.dataset.editCli)));
     t.querySelectorAll('[data-del-cli]').forEach(b=>b.addEventListener('click',()=>cliDel(b.dataset.delCli)));
+    t.querySelectorAll('[data-sel-cli]').forEach(cb=>cb.addEventListener('change',()=>{ if(cb.checked) SEL_CLI.add(cb.dataset.selCli); else SEL_CLI.delete(cb.dataset.selCli); actualizarSel(); }));
+    actualizarSel();
   }
 
   // ── VENCIMIENTOS ──
@@ -761,7 +879,8 @@
     }catch(e){ toast('Error al guardar: '+e.message); }
   }
   async function venDel(id){
-    if(!confirm('¿Eliminar este vencimiento?')) return;
+    const v = DB.venc.find(x=>x.id===id);
+    if(!await confirmar({ titulo:'¿Eliminar este vencimiento?', mensaje: v?`Vas a eliminar "${v.desc}". Esta acción no se puede deshacer.`:'Esta acción no se puede deshacer.', ok:'Sí, eliminar' })) return;
     try{ await api(`/api/vencimientos/${id}`,'DELETE'); await loadAll(); renderAll(); }
     catch(e){ toast('Error al eliminar'); }
   }
@@ -848,7 +967,8 @@ async function docSave(){
   catch(e){ toast('Error al guardar: '+e.message); }
 }
   async function docDel(id){
-    if(!confirm('¿Eliminar documento?')) return;
+    const d = DB.docs.find(x=>x.id===id);
+    if(!await confirmar({ titulo:'¿Eliminar este documento?', mensaje: d?`Vas a eliminar "${d.nombre}". Esta acción no se puede deshacer.`:'Esta acción no se puede deshacer.', ok:'Sí, eliminar' })) return;
     try{ await api(`/api/documentos/${id}`,'DELETE'); await loadAll(); renderAll(); }
     catch(e){ toast('Error al eliminar'); }
   }
@@ -1079,7 +1199,7 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
     }catch(e){ toast('Error al cargar datos demo'); }
   }
   async function resetAll(){
-    if(!confirm('Esto borrará todos los datos del sistema. ¿Continuar?')) return;
+    if(!await confirmar({ titulo:'¿Reiniciar todos los datos?', mensaje:'Se van a borrar TODOS los clientes, vencimientos y documentos del sistema. Esta acción no se puede deshacer.', ok:'Sí, borrar todo' })) return;
     try{
       for(const d of DB.docs){ await api(`/api/documentos/${d.id}`,'DELETE'); }
       for(const v of DB.venc){ await api(`/api/vencimientos/${v.id}`,'DELETE'); }
@@ -1113,7 +1233,8 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
     }catch(e){ toast('Error al guardar: '+e.message); }
   }
   async function usrDel(id){
-    if(!confirm('¿Eliminar este usuario?')) return;
+    const u = USUARIOS.find(x=>String(x.id)===String(id));
+    if(!await confirmar({ titulo:'¿Eliminar este usuario?', mensaje: u?`Vas a eliminar a "${u.nombre}". Esta acción no se puede deshacer.`:'Esta acción no se puede deshacer.', ok:'Sí, eliminar' })) return;
     try{ await api(`/api/usuarios/${id}`,'DELETE'); await loadUsuarios(); renderUsuarios(); toast('Usuario eliminado'); }
     catch(e){ toast('Error al eliminar: '+e.message); }
   }
@@ -1154,6 +1275,8 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
 
   // ── LISTENERS ──
   $('addCli').addEventListener('click',()=>cliModal());
+  $('delSel').addEventListener('click',cliDelMulti);
+  $('cli-all').addEventListener('change',e=>{ filasVisiblesCli().forEach(tr=>{ const id=tr.querySelector('[data-sel-cli]').dataset.selCli; if(e.target.checked) SEL_CLI.add(id); else SEL_CLI.delete(id); tr.querySelector('[data-sel-cli]').checked=e.target.checked; }); actualizarSel(); });
   $('cliSave').addEventListener('click',cliSave);
   $('addVen').addEventListener('click',()=>venModal());
   $('venSave').addEventListener('click',venSave);
@@ -1189,6 +1312,7 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   $('search').addEventListener('input',e=>{
     const q=e.target.value.toLowerCase();
     document.querySelectorAll('#t-cli tr, #t-ven tr').forEach(tr=>{ if(tr.querySelector('.empty')) return; tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none'; });
+    actualizarSel();
   });
 
   // ── TICKER DÓLAR (dolarapi.com — gratis, sin clave) ──

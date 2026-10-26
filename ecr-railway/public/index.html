@@ -353,6 +353,42 @@
   .modal.confirm p { color: var(--ink-2); font-size: 1rem; line-height: 1.55; margin-bottom: 1.5rem; }
   .conf-btns { display: flex; gap: 0.8rem; justify-content: center; }
   .conf-btns .btn { flex: 1; justify-content: center; }
+
+  /* ─── Calendario: colores por tipo y por cliente ─── */
+  .cc { min-height: 118px; padding: 0.45rem; }
+  .cc .dn { font-size: 0.85rem; font-weight: 700; color: var(--ink); }
+  .cc.today { background: #fff6dc; box-shadow: inset 0 0 0 2px #b08d3c; }
+  .cc.today .dn { background: var(--navy); color: #fff; width: 26px; height: 26px; }
+  .ev { display: flex; align-items: center; gap: 0.3rem; font-size: 0.76rem; padding: 0.24rem 0.4rem; border-radius: 4px; margin-bottom: 3px; font-weight: 700; color: #fff; cursor: pointer; }
+  .ev .evt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .ev.imp { background: #1d4ed8; color: #fff; }
+  .ev.lab { background: #c2410c; color: #fff; }
+  .ev.prev { background: #7e22ce; color: #fff; }
+  .ev.soc { background: #047857; color: #fff; }
+  .ev.hecho { opacity: 0.55; text-decoration: line-through; }
+  .ev.mas { background: #e4dfd1; color: var(--ink); border: 1.5px dashed #8a8576; justify-content: center; }
+  .ev.mas:hover { background: #d8d1bd; }
+  .evdot { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--cc, #6b7280); border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+  .evdot.big { width: 18px; height: 18px; }
+  .cal-leg { padding: 0.8rem 1.4rem; border-bottom: 1px solid var(--line-soft); background: var(--panel-2); font-size: 0.82rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .leg-row { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; align-items: center; }
+  .leg-row > b { color: var(--ink); min-width: 58px; }
+  .leg { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--ink); font-weight: 600; }
+  .leg i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+  .leg i.r { border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.4); }
+  .cal-sel { padding: 0.45rem 0.6rem; border: 1.5px solid #9d9580; border-radius: 6px; background: var(--bg-soft); color: var(--ink); font-family: 'Inter'; font-size: 0.9rem; font-weight: 600; text-transform: capitalize; }
+  .selrow { display: flex; align-items: center; gap: 0.6rem; }
+  .selrow select { flex: 1; }
+  .sw { width: 24px; height: 24px; border-radius: 50%; flex: none; border: 2px solid #fff; box-shadow: 0 0 0 1.5px #555; background: #6b7280; }
+  .sw.sq { border-radius: 6px; }
+  .dia-it { display: flex; align-items: center; gap: 0.7rem; padding: 0.75rem 0.9rem; border: 1.5px solid var(--line); border-radius: 8px; margin-bottom: 0.6rem; cursor: pointer; background: #fff; }
+  .dia-it:hover { border-color: var(--gold); background: var(--panel-2); }
+  .dia-bar { width: 6px; align-self: stretch; border-radius: 3px; flex: none; }
+  .dia-it .t { font-weight: 700; color: var(--ink); font-size: 0.95rem; }
+  .dia-it .s { font-size: 0.8rem; color: var(--ink-2); }
+  .chip.tipo { color: #fff; border-color: transparent; }
+  .chip.tipo .dt { background: #fff !important; }
+  .modal.wide { width: 560px; }
 </style>
 </head>
 <body>
@@ -458,10 +494,13 @@
         <div id="ag-cal">
           <div class="cal">
             <div class="calh"><h3 id="cal-t">—</h3><div class="caln">
-              <button class="ib" id="cal-prev">‹</button>
+              <select class="cal-sel" id="cal-mes" aria-label="Mes"></select>
+              <select class="cal-sel" id="cal-anio" aria-label="Año"></select>
+              <button class="ib" id="cal-prev" aria-label="Mes anterior">‹</button>
               <button class="btn btn-soft btn-sm" id="cal-today">Hoy</button>
               <button class="ib" id="cal-next">›</button>
             </div></div>
+            <div class="cal-leg" id="cal-leg"></div>
             <div class="cg" id="cal-g"></div>
           </div>
         </div>
@@ -583,14 +622,21 @@
   <div class="mb">
     <input type="hidden" id="vi-id">
     <div class="fld"><label>Descripción</label><input id="vi-d" placeholder="Presentación IVA"></div>
-    <div class="fld"><label>Cliente</label><select id="vi-c"></select></div>
+    <div class="fld"><label>Cliente <span style="font-weight:500;color:var(--muted)">(su color lo identifica en el calendario)</span></label><div class="selrow"><span class="sw" id="vi-sw"></span><select id="vi-c"></select></div></div>
     <div class="frow">
-      <div class="fld"><label>Tipo</label><select id="vi-t"><option>Impositivo</option><option>Laboral</option><option>Previsional</option><option>Societario</option></select></div>
+      <div class="fld"><label>Tipo</label><div class="selrow"><span class="sw sq" id="vi-tsw"></span><select id="vi-t"><option>Impositivo</option><option>Laboral</option><option>Previsional</option><option>Societario</option></select></div></div>
       <div class="fld"><label>Fecha</label><input id="vi-f" type="date"></div>
     </div>
     <div class="fld"><label>Estado</label><select id="vi-e"><option>Pendiente</option><option>En proceso</option><option>Cumplido</option></select></div>
   </div>
   <div class="mf"><button class="btn btn-soft" data-close="m-ven">Cancelar</button><button class="btn btn-pri" id="venSave">Guardar</button></div>
+</div></div>
+
+<!-- MODAL DÍA DEL CALENDARIO -->
+<div class="ov" id="m-dia"><div class="modal wide">
+  <div class="mh"><h3 id="dia-t">Vencimientos del día</h3><button class="x" data-close="m-dia">×</button></div>
+  <div class="mb" id="dia-b"></div>
+  <div class="mf"><button class="btn btn-soft" data-close="m-dia">Cerrar</button><button class="btn btn-pri" id="dia-add">+ Agregar vencimiento</button></div>
 </div></div>
 
 <!-- MODAL DOC -->
@@ -714,6 +760,17 @@
       aplicarAlcanceRol();
     }catch(e){ toast('No se pudo conectar con el servidor'); }
   }
+  // ── COLORES: por tipo de vencimiento y por cliente ──
+  const TIPO_COL = { 'Impositivo':'#1d4ed8', 'Laboral':'#c2410c', 'Previsional':'#7e22ce', 'Societario':'#047857' };
+  const TIPO_CLS = { 'Impositivo':'imp', 'Laboral':'lab', 'Previsional':'prev', 'Societario':'soc' };
+  const PALETA_CLI = ['#e11d48','#0891b2','#d97706','#16a34a','#9333ea','#0f766e','#ea580c','#4f46e5','#65a30d','#db2777','#475569','#92400e'];
+  const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  function cliColor(id){
+    if(!id) return '#6b7280';
+    const n = parseInt(id,10) || 0;
+    return n>=1 && n<=PALETA_CLI.length ? PALETA_CLI[n-1] : `hsl(${Math.round((n*137.508)%360)},70%,38%)`;
+  }
+  const isoLocal = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const cliName = id => { const c = DB.clientes.find(x=>x.id===id); return c?c.nombre:'General del estudio'; };
 
   let calRef = new Date();
@@ -866,8 +923,9 @@
     $('venTitle').textContent = id ? 'Editar vencimiento' : 'Nuevo vencimiento';
     if(id){ const v=DB.venc.find(x=>x.id===id); $('vi-id').value=v.id; $('vi-d').value=v.desc; $('vi-c').value=v.cli||''; $('vi-t').value=v.tipo; $('vi-f').value=v.fecha; $('vi-e').value=v.estado; }
     else { $('vi-id').value=''; $('vi-d').value=''; $('vi-c').value=''; $('vi-t').value='Impositivo'; $('vi-f').value=preset||new Date(Date.now()+5*864e5).toISOString().slice(0,10); $('vi-e').value='Pendiente'; }
-    openM('m-ven');
+    updVenSw(); openM('m-ven');
   }
+  function updVenSw(){ $('vi-sw').style.background = cliColor($('vi-c').value); $('vi-tsw').style.background = TIPO_COL[$('vi-t').value] || '#6b7280'; }
   async function venSave(){
     const desc=$('vi-d').value.trim(), fecha=$('vi-f').value;
     if(!desc||!fecha){ toast('Completá descripción y fecha'); return; }
@@ -894,8 +952,8 @@
       else if(d<0) c='<span class="chip bad"><span class="dt"></span>Vencido</span>';
       else if(d<=7) c=`<span class="chip warn"><span class="dt"></span>En ${d}d</span>`;
       else c=`<span class="chip info"><span class="dt"></span>En ${d}d</span>`;
-      return `<tr><td><div class="nm">${esc(v.desc)}</div></td><td>${esc(cliName(v.cli))}</td>
-        <td><span class="chip dim"><span class="dt"></span>${v.tipo}</span></td>
+      return `<tr><td><div class="nm">${esc(v.desc)}</div></td><td><span style="display:inline-flex;align-items:center;gap:0.5rem"><span class="evdot" style="--cc:${cliColor(v.cli)}"></span>${esc(cliName(v.cli))}</span></td>
+        <td><span class="chip tipo" style="background:${TIPO_COL[v.tipo]||'#475569'}"><span class="dt"></span>${esc(v.tipo)}</span></td>
         <td>${new Date(v.fecha+'T00:00').toLocaleDateString('es-AR')}</td><td>${c}</td>
         <td><div class="acts"><button class="ib" data-edit-ven="${v.id}">✎</button><button class="ib d" data-del-ven="${v.id}">×</button></div></td></tr>`;
     }).join('');
@@ -913,13 +971,23 @@
   }
   function renderCal(){
     const y=calRef.getFullYear(), m=calRef.getMonth();
-    $('cal-t').textContent = calRef.toLocaleDateString('es-AR',{month:'long',year:'numeric'});
+    $('cal-t').textContent = MESES[m].charAt(0).toUpperCase()+MESES[m].slice(1)+' de '+y;
+    const sm=$('cal-mes'), sy=$('cal-anio'), yHoy=new Date().getFullYear();
+    if(!sm.options.length) sm.innerHTML = MESES.map((n,i)=>`<option value="${i}">${n}</option>`).join('');
+    const y0=Math.min(y,yHoy)-5, y1=Math.max(y,yHoy)+5;
+    if(sy.dataset.rango!==y0+'-'+y1){
+      let o=''; for(let a=y0;a<=y1;a++) o+=`<option value="${a}">${a}</option>`;
+      sy.innerHTML=o; sy.dataset.rango=y0+'-'+y1;
+    }
+    sm.value=String(m); sy.value=String(y);
+    $('cal-leg').innerHTML =
+      '<div class="leg-row"><b>Tipo:</b>' + Object.keys(TIPO_COL).map(k=>`<span class="leg"><i style="background:${TIPO_COL[k]}"></i>${k}</span>`).join('') + '</div>' +
+      (DB.clientes.length ? '<div class="leg-row"><b>Cliente:</b>' + DB.clientes.map(c=>`<span class="leg"><i class="r" style="background:${cliColor(c.id)}"></i>${esc(c.nombre)}</span>`).join('') + '</div>' : '');
     const startDow=(new Date(y,m,1).getDay()+6)%7;
     const days=new Date(y,m+1,0).getDate();
     const prevDays=new Date(y,m,0).getDate();
     const dow=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
-    const todayISO=new Date().toISOString().slice(0,10);
-    const tmap={'Impositivo':'imp','Laboral':'lab','Previsional':'prev','Societario':'soc'};
+    const todayISO=isoLocal(new Date());
     const cells=[];
     for(let i=startDow-1;i>=0;i--) cells.push({d:prevDays-i,out:true});
     for(let d=1;d<=days;d++) cells.push({d,iso:`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`});
@@ -928,13 +996,30 @@
     html+=cells.map(c=>{
       if(c.out) return `<div class="cc out"><div class="dn">${c.d}</div></div>`;
       const evs=DB.venc.filter(v=>v.fecha===c.iso);
-      const ev=evs.slice(0,3).map(v=>`<div class="ev ${tmap[v.tipo]||'imp'}" data-ev="${v.id}" title="${esc(v.desc)}">${esc(v.desc)}</div>`).join('');
-      const more=evs.length>3?`<div class="ev dim">+${evs.length-3} más</div>`:'';
-      return `<div class="cc ${c.iso===todayISO?'today':''}" data-new="${c.iso}"><div class="dn">${c.d}</div>${ev}${more}</div>`;
+      const ev=evs.slice(0,3).map(v=>`<div class="ev ${TIPO_CLS[v.tipo]||'imp'}${v.estado==='Cumplido'?' hecho':''}" data-ev="${v.id}" title="${esc(v.desc)} — ${esc(cliName(v.cli))} (${esc(v.tipo)})"><span class="evdot" style="--cc:${cliColor(v.cli)}"></span><span class="evt">${esc(v.desc)}</span></div>`).join('');
+      const more=evs.length>3?`<div class="ev mas" title="Ver todos los vencimientos de este día">+${evs.length-3} más</div>`:'';
+      return `<div class="cc ${c.iso===todayISO?'today':''}" data-dia="${c.iso}"><div class="dn">${c.d}</div>${ev}${more}</div>`;
     }).join('');
     $('cal-g').innerHTML=html;
     $('cal-g').querySelectorAll('[data-ev]').forEach(e=>e.addEventListener('click',ev=>{ ev.stopPropagation(); venModal(e.dataset.ev); }));
-    $('cal-g').querySelectorAll('[data-new]').forEach(c=>c.addEventListener('dblclick',()=>venModal(null,c.dataset.new)));
+    $('cal-g').querySelectorAll('[data-dia]').forEach(c=>c.addEventListener('click',()=>diaModal(c.dataset.dia)));
+  }
+  // Día expandido: lista TODOS los vencimientos de esa fecha
+  let diaActual = null;
+  function diaModal(iso){
+    diaActual = iso;
+    const f = new Date(iso+'T00:00');
+    $('dia-t').textContent = f.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    const evs = DB.venc.filter(v=>v.fecha===iso);
+    $('dia-b').innerHTML = evs.length ? evs.map(v=>`<div class="dia-it" data-dia-ev="${v.id}">
+        <span class="dia-bar" style="background:${TIPO_COL[v.tipo]||'#475569'}"></span>
+        <span class="evdot big" style="--cc:${cliColor(v.cli)}"></span>
+        <div class="lm"><div class="t">${esc(v.desc)}</div><div class="s">${esc(cliName(v.cli))} · ${esc(v.tipo)} · ${esc(v.estado)}</div></div>
+        <button class="ib" title="Editar">✎</button></div>`).join('')
+      : '<div class="empty"><div class="e">▦</div>No hay vencimientos este día.</div>';
+    $('dia-b').querySelectorAll('[data-dia-ev]').forEach(r=>r.addEventListener('click',()=>{ closeM('m-dia'); venModal(r.dataset.diaEv); }));
+    $('dia-add').style.display = PUEDE_EDITAR ? '' : 'none';
+    openM('m-dia');
   }
 
   // ── DOCS ──
@@ -1306,9 +1391,14 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   document.querySelectorAll('.quick span').forEach(s=>s.addEventListener('click',()=>{ $('chatIn').value=s.dataset.q; send(); }));
   $('sg-cal').addEventListener('click',()=>setAgenda('cal'));
   $('sg-list').addEventListener('click',()=>setAgenda('list'));
-  $('cal-prev').addEventListener('click',()=>{ calRef.setMonth(calRef.getMonth()-1); renderCal(); });
-  $('cal-next').addEventListener('click',()=>{ calRef.setMonth(calRef.getMonth()+1); renderCal(); });
+  $('cal-prev').addEventListener('click',()=>{ calRef=new Date(calRef.getFullYear(),calRef.getMonth()-1,1); renderCal(); });
+  $('cal-next').addEventListener('click',()=>{ calRef=new Date(calRef.getFullYear(),calRef.getMonth()+1,1); renderCal(); });
   $('cal-today').addEventListener('click',()=>{ calRef=new Date(); renderCal(); });
+  $('cal-mes').addEventListener('change',e=>{ calRef=new Date(calRef.getFullYear(),+e.target.value,1); renderCal(); });
+  $('cal-anio').addEventListener('change',e=>{ calRef=new Date(+e.target.value,calRef.getMonth(),1); renderCal(); });
+  $('dia-add').addEventListener('click',()=>{ closeM('m-dia'); venModal(null,diaActual); });
+  $('vi-c').addEventListener('change',updVenSw);
+  $('vi-t').addEventListener('change',updVenSw);
   $('search').addEventListener('input',e=>{
     const q=e.target.value.toLowerCase();
     document.querySelectorAll('#t-cli tr, #t-ven tr').forEach(tr=>{ if(tr.querySelector('.empty')) return; tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none'; });

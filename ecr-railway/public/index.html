@@ -430,6 +430,15 @@
   #v-asistente .feed { min-height: 120px; scroll-behavior: smooth; }
   #v-asistente .bub { font-size: 0.95rem; }
   #v-asistente .cbar input { font-size: 1rem; padding: 0.8rem 1.05rem; border: 1.5px solid #9d9580; }
+
+  /* ─── Selección múltiple de documentos ─── */
+  .doc { position: relative; }
+  .doc-sel { position: absolute; top: 0.7rem; right: 0.7rem; }
+  .doc-sel input, #doc-all { width: 22px; height: 22px; cursor: pointer; accent-color: #8f6a14; }
+  .doc.is-sel { border-color: var(--gold); background: #f6ecd0; }
+  #doc-selbar { margin-left: auto; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+  #doc-selbar label { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600; color: var(--ink); cursor: pointer; }
+  body.no-edit #doc-selbar, body.no-edit .doc-sel { display: none !important; }
 </style>
 </head>
 <body>
@@ -554,7 +563,7 @@
       <!-- DOCS -->
       <section class="view" id="v-docs">
         <div class="tbar"><h2>Archivo digital</h2><div class="r"><div class="lupa"><span class="lp">🔍</span><input id="doc-q" type="search" placeholder="Buscar cliente o documento…" autocomplete="off"></div><button class="btn btn-pri" id="addDoc">+ Documento</button></div></div>
-        <div class="docs-back" id="docs-back" style="display:none"><button class="btn btn-soft" id="doc-back">← Todos los clientes</button><h3 id="doc-cli-t"></h3></div>
+        <div class="docs-back" id="docs-back" style="display:none"><button class="btn btn-soft" id="doc-back">← Todos los clientes</button><h3 id="doc-cli-t"></h3><div id="doc-selbar"><label><input type="checkbox" id="doc-all"> Seleccionar todos</label><button class="btn btn-danger" id="doc-delsel" style="display:none"><span>🗑 Eliminar seleccionados (<span id="doc-delsel-n">0</span>)</span></button></div></div>
         <div class="docs" id="g-docs"></div>
       </section>
 
@@ -1106,6 +1115,25 @@ async function docSave(){
     catch(e){ toast('Error al eliminar'); }
   }
   // Carpetas por cliente: cada cliente aparece UNA vez; al entrar se ven todos sus archivos.
+  const SEL_DOC = new Set();
+  let DOC_VISIBLES = [];
+  function actualizarSelDoc(){
+    const n=[...SEL_DOC].filter(id=>DB.docs.some(d=>d.id===id)).length;
+    $('doc-delsel').style.display = (n && PUEDE_EDITAR) ? '' : 'none';
+    $('doc-delsel-n').textContent = n;
+    const marc = DOC_VISIBLES.filter(id=>SEL_DOC.has(id)).length;
+    $('doc-all').checked = DOC_VISIBLES.length>0 && marc===DOC_VISIBLES.length;
+    $('doc-all').indeterminate = marc>0 && marc<DOC_VISIBLES.length;
+    document.querySelectorAll('#g-docs .doc[data-doc]').forEach(el=>el.classList.toggle('is-sel', SEL_DOC.has(el.dataset.doc)));
+  }
+  async function docDelMulti(){
+    const ids=[...SEL_DOC].filter(id=>DB.docs.some(d=>d.id===id)); if(!ids.length) return;
+    if(!await confirmar({ titulo: ids.length===1?'¿Eliminar 1 documento?':`¿Eliminar ${ids.length} documentos?`, mensaje:'Los archivos se borran definitivamente. Esta acción no se puede deshacer.', ok: ids.length===1?'Sí, eliminar':`Sí, eliminar ${ids.length}` })) return;
+    let fallos=0;
+    for(const id of ids){ try{ await api(`/api/documentos/${id}`,'DELETE'); }catch(e){ fallos++; } }
+    SEL_DOC.clear(); await loadAll(); renderAll();
+    toast(fallos?`No se pudieron eliminar ${fallos} documento(s)`:(ids.length===1?'Documento eliminado':`${ids.length} documentos eliminados`));
+  }
   let DOC_CLI = null;   // null = lista de carpetas; '' = documentos generales; id = carpeta de ese cliente
   const norm = t => String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
   function renderDocs(){
@@ -1117,6 +1145,7 @@ async function docSave(){
     if(DOC_CLI!==null && !grupos.has(DOC_CLI)) DOC_CLI = null;
     if(DOC_CLI===null && ES_PYME && grupos.size===1 && !q) DOC_CLI = [...grupos.keys()][0];
     $('docs-back').style.display = DOC_CLI===null ? 'none' : 'flex';
+    DOC_VISIBLES = [];
 
     if(DOC_CLI===null){
       // ── vista de carpetas ──
@@ -1131,7 +1160,7 @@ async function docSave(){
         return `<div class="doc folder" data-carpeta="${esc(c.k)}" tabindex="0" role="button" aria-label="Abrir carpeta de ${esc(c.nombre)}"><span class="cnt">${c.ds.length}</span><div class="di">📁</div><div class="dt">${esc(c.nombre)}</div><div class="dm">${c.ds.length} documento${c.ds.length>1?'s':''}</div><div class="dm">Último: ${new Date(ult+'T00:00').toLocaleDateString('es-AR')}</div>${nota}</div>`;
       }).join('');
       g.querySelectorAll('[data-carpeta]').forEach(el=>{
-        const abrir=()=>{ DOC_CLI=el.dataset.carpeta; $('doc-q').value=''; renderDocs(); };
+        const abrir=()=>{ SEL_DOC.clear(); DOC_CLI=el.dataset.carpeta; $('doc-q').value=''; renderDocs(); };
         el.addEventListener('click',abrir);
         el.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); abrir(); } });
       });
@@ -1142,13 +1171,16 @@ async function docSave(){
     $('doc-cli-t').textContent = '📁 ' + cliName(DOC_CLI);
     let lista = (grupos.get(DOC_CLI)||[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)) || (+b.id)-(+a.id));
     if(q) lista = lista.filter(d=>norm(d.nombre).includes(q)||norm(d.tipo).includes(q));
-    if(!lista.length){ g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="e">▭</div>Ningún documento coincide con la búsqueda.</div>`; return; }
+    DOC_VISIBLES = lista.map(d=>d.id);
+    if(!lista.length){ g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="e">▭</div>Ningún documento coincide con la búsqueda.</div>`; actualizarSelDoc(); return; }
     g.innerHTML = lista.map(d=>{
       const ver = d.archivo_mime ? `<a href="${API_BASE}/api/documentos/${d.id}/archivo" target="_blank" rel="noopener" class="btn btn-soft btn-sm">Ver archivo</a>` : `<span class="dm" style="font-style:italic">Sin archivo adjunto</span>`;
       const del = PUEDE_EDITAR ? `<button class="btn btn-soft btn-sm" style="color:var(--red);border-color:var(--red)" data-del-doc="${d.id}">Eliminar</button>` : '';
-      return `<div class="doc"><div class="di">${ic[d.tipo]||'📁'}</div><div class="dt">${esc(d.nombre)}</div><div class="dm">${esc(d.tipo)}</div><div class="dm">${new Date(d.fecha+'T00:00').toLocaleDateString('es-AR')}</div><div class="doc-acts">${ver}${del}</div></div>`;
+      return `<div class="doc" data-doc="${d.id}">${PUEDE_EDITAR?`<label class="doc-sel" title="Seleccionar"><input type="checkbox" data-sel-doc="${d.id}" ${SEL_DOC.has(d.id)?'checked':''}></label>`:''}<div class="di">${ic[d.tipo]||'📁'}</div><div class="dt">${esc(d.nombre)}</div><div class="dm">${esc(d.tipo)}</div><div class="dm">${new Date(d.fecha+'T00:00').toLocaleDateString('es-AR')}</div><div class="doc-acts">${ver}${del}</div></div>`;
     }).join('');
     g.querySelectorAll('[data-del-doc]').forEach(b=>b.addEventListener('click',()=>docDel(b.dataset.delDoc)));
+    g.querySelectorAll('[data-sel-doc]').forEach(cb=>cb.addEventListener('change',()=>{ if(cb.checked) SEL_DOC.add(cb.dataset.selDoc); else SEL_DOC.delete(cb.dataset.selDoc); actualizarSelDoc(); }));
+    actualizarSelDoc();
   }
 
   // ── INICIO ──
@@ -1470,7 +1502,9 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   $('venSave').addEventListener('click',venSave);
   $('addDoc').addEventListener('click',docModal);
   $('doc-q').addEventListener('input', renderDocs);
-  $('doc-back').addEventListener('click',()=>{ DOC_CLI=null; $('doc-q').value=''; renderDocs(); });
+  $('doc-delsel').addEventListener('click', docDelMulti);
+  $('doc-all').addEventListener('change',e=>{ DOC_VISIBLES.forEach(id=>{ if(e.target.checked) SEL_DOC.add(id); else SEL_DOC.delete(id); }); document.querySelectorAll('[data-sel-doc]').forEach(cb=>cb.checked=e.target.checked); actualizarSelDoc(); });
+  $('doc-back').addEventListener('click',()=>{ SEL_DOC.clear(); DOC_CLI=null; $('doc-q').value=''; renderDocs(); });
   $('ai-cli').addEventListener('change', updateAiCliInfo);
   $('docSave').addEventListener('click',docSave);
   $('seedBtn').addEventListener('click',seed);

@@ -404,6 +404,24 @@
   .doc .doc-acts { display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
   .doc { cursor: default; }
   .doc.folder { cursor: pointer; }
+
+  /* ─── Reportes ─── */
+  .rep-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.1rem; margin-bottom: 1.6rem; }
+  .doc:not(.folder):hover { transform: none; border-color: var(--line); box-shadow: var(--shadow); }
+  .bars { height: 250px; gap: 1.2rem; }
+  .bb { max-width: 70px; border-radius: 6px 6px 0 0; min-height: 4px; }
+  .bv { font-size: 0.82rem; }
+  .bl { font-size: 0.8rem; color: var(--ink); font-weight: 600; max-width: 130px; line-height: 1.25; }
+  .rep-wrap { display: flex; gap: 2rem; align-items: center; flex-wrap: wrap; }
+  .rep-wrap > .chart { flex: 1 1 340px; min-width: 280px; }
+  .rep-wrap > .leg-t { flex: 1 1 380px; }
+  .pie-box { display: flex; justify-content: center; }
+  .pie-box svg { max-width: 300px; width: 100%; height: auto; }
+  .pie-box text { font-family: 'Inter'; font-weight: 800; font-size: 15px; fill: #fff; paint-order: stroke; stroke: rgba(0,0,0,.45); stroke-width: 3px; }
+  .leg-t table { font-size: 0.9rem; }
+  .leg-t td, .leg-t th { padding: 0.6rem 0.7rem; }
+  .leg-t .sq { display: inline-block; width: 16px; height: 16px; border-radius: 4px; vertical-align: middle; margin-right: 0.5rem; }
+  .leg-t tfoot td { font-weight: 800; background: var(--panel-2); border-top: 2px solid #bdb59f; }
 </style>
 </head>
 <body>
@@ -559,13 +577,17 @@
       <!-- REPORTES -->
       <section class="view" id="v-reportes">
         <div class="tbar"><h2>Reportes y métricas</h2></div>
-        <div class="row4">
-          <div class="metric" style="--accentc:var(--green)"><div class="lbl">Facturación anual est.</div><div class="num" id="r-an" style="font-size:1.45rem">$0</div><div class="tr">Proyección 12m</div></div>
-          <div class="metric" style="--accentc:var(--gold)"><div class="lbl">Ticket promedio</div><div class="num" id="r-tk" style="font-size:1.45rem">$0</div><div class="tr">Por cliente</div></div>
-          <div class="metric" style="--accentc:var(--blue)"><div class="lbl">Cumplimiento</div><div class="num" id="r-cm">0%</div><div class="tr up">Vencimientos OK</div></div>
+        <div class="rep-grid">
+          <div class="metric" style="--accentc:#15803d"><div class="lbl">Total por mes</div><div class="num" id="r-mes" style="font-size:1.45rem">$0</div><div class="tr">Honorarios de la cartera activa</div></div>
+          <div class="metric" style="--accentc:#1d4ed8"><div class="lbl">Total anual</div><div class="num" id="r-an" style="font-size:1.45rem">$0</div><div class="tr">Honorarios de todo el año</div></div>
+          <div class="metric" style="--accentc:var(--gold)"><div class="lbl">Ticket promedio</div><div class="num" id="r-tk" style="font-size:1.45rem">$0</div><div class="tr">Por cliente, por mes</div></div>
+          <div class="metric" style="--accentc:var(--blue)"><div class="lbl">Cumplimiento</div><div class="num" id="r-cm">0%</div><div class="tr" id="r-cm-t"></div></div>
           <div class="metric" style="--accentc:var(--amber)"><div class="lbl">Docs / cliente</div><div class="num" id="r-dc">0</div><div class="tr">Promedio</div></div>
         </div>
-        <div class="panel"><div class="ph"><h3>Honorarios por servicio</h3><span class="m">distribución de la cartera</span></div><div class="pb"><div class="bars" id="bars"></div></div></div>
+        <div class="panel">
+          <div class="ph"><h3>Honorarios por servicio</h3><div class="seg"><button class="on" id="rg-bar">Barras</button><button id="rg-pie">Circular</button></div></div>
+          <div class="pb"><div class="rep-wrap"><div class="chart" id="rep-chart"></div><div class="leg-t" id="rep-leg"></div></div></div>
+        </div>
       </section>
 
       <!-- AJUSTES -->
@@ -1146,17 +1168,51 @@ async function docSave(){
   }
 
   // ── REPORTES ──
+  const SERV_COL = { 'Asesoramiento integral':'#1d4ed8', 'Sueldos + Impuestos':'#c2410c', 'Contabilidad general':'#15803d', 'Monotributo':'#9333ea', 'Balance + DDJJ':'#ca8a04' };
+  const SERV_EXTRA = ['#0e7490','#be185d','#475569','#65a30d'];
+  const servColor = (k,i) => SERV_COL[k] || SERV_EXTRA[i % SERV_EXTRA.length];
+  let repModo = 'bar';
+  function pieSVG(items, total){
+    const R=110, cx=120, cy=120;
+    if(items.length===1){
+      return `<svg viewBox="0 0 240 240" role="img" aria-label="Gráfico circular"><circle cx="${cx}" cy="${cy}" r="${R}" fill="${items[0].col}" stroke="#fff" stroke-width="3"><title>${esc(items[0].k)}: 100%</title></circle><text x="${cx}" y="${cy+5}" text-anchor="middle">100%</text></svg>`;
+    }
+    let ang=-Math.PI/2, out='';
+    items.forEach(it=>{
+      const fr=it.v/total, a2=ang+fr*2*Math.PI, large=fr>0.5?1:0;
+      const x1=cx+R*Math.cos(ang), y1=cy+R*Math.sin(ang), x2=cx+R*Math.cos(a2), y2=cy+R*Math.sin(a2);
+      out += `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${R},${R} 0 ${large} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${it.col}" stroke="#fff" stroke-width="3"><title>${esc(it.k)}: ${Math.round(fr*100)}% (${money(it.v)}/mes)</title></path>`;
+      if(fr>=0.07){ const am=(ang+a2)/2; out += `<text x="${(cx+R*0.62*Math.cos(am)).toFixed(1)}" y="${(cy+R*0.62*Math.sin(am)+5).toFixed(1)}" text-anchor="middle">${Math.round(fr*100)}%</text>`; }
+      ang=a2;
+    });
+    return `<svg viewBox="0 0 240 240" role="img" aria-label="Gráfico circular de honorarios por servicio">${out}</svg>`;
+  }
   function renderRep(){
     const act=DB.clientes.filter(c=>c.estado==='Activo');
     const hon=act.reduce((s,c)=>s+(+c.honorarios||0),0);
+    $('r-mes').textContent=money(hon);
     $('r-an').textContent=money(hon*12);
     $('r-tk').textContent=money(act.length?Math.round(hon/act.length):0);
     const tot=DB.venc.length, ok=DB.venc.filter(v=>v.estado==='Cumplido').length;
     $('r-cm').textContent=(tot?Math.round(ok/tot*100):0)+'%';
+    $('r-cm-t').textContent = tot ? `${ok} de ${tot}` : '';
     $('r-dc').textContent=act.length?(DB.docs.length/act.length).toFixed(1):'0';
-    const by={}; act.forEach(c=>by[c.servicio]=(by[c.servicio]||0)+(+c.honorarios||0));
-    const ent=Object.entries(by), mx=Math.max(1,...ent.map(e=>e[1]));
-    $('bars').innerHTML=ent.length?ent.map(([k,v])=>`<div class="bc"><div class="bv">${money(v)}</div><div class="bb" style="height:${(v/mx)*100}%"></div><div class="bl">${esc(k.split(' ')[0])}</div></div>`).join(''):`<div class="empty" style="margin:auto"><div class="e">▥</div>Sin datos</div>`;
+    $('rg-bar').classList.toggle('on', repModo==='bar');
+    $('rg-pie').classList.toggle('on', repModo==='pie');
+    const by={}, cnt={}; act.forEach(c=>{ by[c.servicio]=(by[c.servicio]||0)+(+c.honorarios||0); cnt[c.servicio]=(cnt[c.servicio]||0)+1; });
+    const items=Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>({k,v,n:cnt[k],col:servColor(k,i)}));
+    if(!items.length || hon<=0){
+      $('rep-chart').innerHTML=`<div class="empty"><div class="e">▥</div>Sin datos</div>`; $('rep-leg').innerHTML=''; return;
+    }
+    if(repModo==='pie'){
+      $('rep-chart').innerHTML = `<div class="pie-box">${pieSVG(items,hon)}</div>`;
+    } else {
+      const mx=Math.max(1,...items.map(i=>i.v));
+      $('rep-chart').innerHTML = `<div class="bars">` + items.map(i=>`<div class="bc"><div class="bv">${money(i.v)}</div><div class="bb" style="height:${(i.v/mx)*100}%;background:${i.col}" title="${esc(i.k)}"></div><div class="bl">${esc(i.k)}</div></div>`).join('') + `</div>`;
+    }
+    $('rep-leg').innerHTML = `<table><thead><tr><th>Servicio</th><th>Clientes</th><th>Por mes</th><th>Por año</th><th>%</th></tr></thead><tbody>` +
+      items.map(i=>`<tr><td><span class="sq" style="background:${i.col}"></span><b>${esc(i.k)}</b></td><td>${i.n}</td><td>${money(i.v)}</td><td>${money(i.v*12)}</td><td>${Math.round(i.v/hon*100)}%</td></tr>`).join('') +
+      `</tbody><tfoot><tr><td>Total</td><td>${act.length}</td><td>${money(hon)}</td><td>${money(hon*12)}</td><td>100%</td></tr></tfoot></table>`;
   }
 
   // ── ASISTENTE (búsqueda web ARCA + cualquier sitio + datos del estudio) ──
@@ -1429,6 +1485,8 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   document.querySelectorAll('.quick span').forEach(s=>s.addEventListener('click',()=>{ $('chatIn').value=s.dataset.q; send(); }));
   $('sg-cal').addEventListener('click',()=>setAgenda('cal'));
   $('sg-list').addEventListener('click',()=>setAgenda('list'));
+  $('rg-bar').addEventListener('click',()=>{ repModo='bar'; renderRep(); });
+  $('rg-pie').addEventListener('click',()=>{ repModo='pie'; renderRep(); });
   $('cal-prev').addEventListener('click',()=>{ calRef=new Date(calRef.getFullYear(),calRef.getMonth()-1,1); renderCal(); });
   $('cal-next').addEventListener('click',()=>{ calRef=new Date(calRef.getFullYear(),calRef.getMonth()+1,1); renderCal(); });
   $('cal-today').addEventListener('click',()=>{ calRef=new Date(); renderCal(); });

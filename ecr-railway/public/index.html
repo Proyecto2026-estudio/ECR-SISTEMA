@@ -422,6 +422,14 @@
   .leg-t td, .leg-t th { padding: 0.6rem 0.7rem; }
   .leg-t .sq { display: inline-block; width: 16px; height: 16px; border-radius: 4px; vertical-align: middle; margin-right: 0.5rem; }
   .leg-t tfoot td { font-weight: 800; background: var(--panel-2); border-top: 2px solid #bdb59f; }
+
+  /* ─── Asistente: ocupa la pantalla y la barra de escribir queda siempre visible abajo ─── */
+  #v-asistente > .panel { display: flex; flex-direction: column; height: calc(100vh - 230px); min-height: 520px; }
+  #v-asistente > .panel > .pb { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-bottom: 1rem; }
+  #v-asistente .chat { flex: 1; min-height: 0; height: auto; }
+  #v-asistente .feed { min-height: 120px; scroll-behavior: smooth; }
+  #v-asistente .bub { font-size: 0.95rem; }
+  #v-asistente .cbar input { font-size: 1rem; padding: 0.8rem 1.05rem; border: 1.5px solid #9d9580; }
 </style>
 </head>
 <body>
@@ -1302,7 +1310,7 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   async function send(){
     const i=$('chatIn'), q=i.value.trim(); if(!q) return;
     const f=$('feed');
-    f.innerHTML += `<div class="bub me">${esc(q)}</div>`; i.value=''; f.scrollTop=f.scrollHeight;
+    f.innerHTML += `<div class="bub me">${esc(q)}</div>`; i.value=''; f.scrollTop=f.scrollHeight; try{ $('chatIn').scrollIntoView({block:'nearest'}); }catch(e){}
     const lid='l'+uid();
     const conCarpeta = !!($('ai-cli') && $('ai-cli').value);
     f.innerHTML += `<div class="bub ai" id="${lid}"><span style="opacity:.7">${conCarpeta?'Leyendo los documentos del cliente…':'Consultando en la web…'}</span></div>`;

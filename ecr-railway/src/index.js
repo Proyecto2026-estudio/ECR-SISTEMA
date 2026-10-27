@@ -101,11 +101,13 @@ app.post('/api/login', async (req, res) => {
   try {
     const { password } = req.body;
     const email = String(req.body.email || '').trim();
-    if (!email || !password) return res.status(400).json({ error: 'Falta email o contraseña' });
+    if (!email && !password) return res.status(400).json({ error: 'Ingresá tu correo electrónico y tu contraseña.' });
+    if (!email) return res.status(400).json({ error: 'Falta el correo electrónico. Ingresalo para continuar.' });
+    if (!password) return res.status(400).json({ error: 'Falta la contraseña. Ingresala para continuar.' });
     const [rows] = await db.query('SELECT * FROM usuarios WHERE LOWER(TRIM(email)) = LOWER(?)', [email]);
     if (rows.length === 0) {
       console.warn('Login fallido: el email no está registrado ->', email);
-      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+      return res.status(401).json({ error: 'El correo electrónico no está registrado. Revisá que esté bien escrito.', campo: 'email' });
     }
     const usuario = rows[0];
     let ok = false;
@@ -116,7 +118,7 @@ app.post('/api/login', async (req, res) => {
     } catch (e) { console.error('Login: hash de contraseña inválido para el usuario', usuario.id, e.message); }
     if (!ok) {
       console.warn('Login fallido: contraseña incorrecta -> usuario', usuario.id, usuario.email);
-      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+      return res.status(401).json({ error: 'La contraseña es incorrecta. Revisá que esté bien escrita, cuidando mayúsculas y minúsculas.', campo: 'password' });
     }
     const token = signToken(usuario);
     res.json({ token, usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol, cliente_id: usuario.cliente_id || null } });

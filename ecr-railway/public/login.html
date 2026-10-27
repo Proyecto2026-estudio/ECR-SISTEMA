@@ -182,6 +182,8 @@
       if (!res.ok) {
         errorBox.textContent = data.error || 'No se pudo iniciar sesión';
         errorBox.style.display = 'block';
+        const campo = data.campo === 'email' ? document.getElementById('email') : (data.campo === 'password' ? document.getElementById('password') : null);
+        if (campo) { campo.focus(); campo.select && campo.select(); }
         return;
       }
       localStorage.setItem('ecr_token', data.token);

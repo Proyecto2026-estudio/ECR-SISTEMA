@@ -490,6 +490,25 @@
   .helpbox code { background: rgba(255,255,255,.7); padding: 0.05rem 0.35rem; border-radius: 4px; }
   textarea.big { width: 100%; min-height: 130px; padding: 0.7rem 0.8rem; border: 1.5px solid #9d9580; border-radius: 8px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.85rem; background: var(--bg-soft); color: var(--ink); resize: vertical; }
   .mf .sum { margin-right: auto; font-size: 0.88rem; font-weight: 600; color: var(--ink-2); align-self: center; }
+
+  /* ─── Carga masiva de documentos ─── */
+  body.no-edit #addDocMasa { display: none !important; }
+  .dropzone { border: 2.5px dashed #9d9580; border-radius: 12px; background: var(--panel-2); padding: 1.6rem 1rem; text-align: center; color: var(--ink-2); cursor: pointer; transition: all .15s; }
+  .dropzone:hover, .dropzone.over { border-color: var(--gold); background: var(--gold-soft); }
+  .dropzone .big { font-size: 2.2rem; }
+  .dropzone b { color: var(--ink); font-size: 1rem; }
+  .dm-list { max-height: 300px; overflow-y: auto; border: 1.5px solid var(--line); border-radius: 8px; background: #fff; margin-top: 0.9rem; }
+  .dm-row { display: grid; grid-template-columns: 26px 1fr 170px 70px 30px; gap: 0.6rem; align-items: center; padding: 0.5rem 0.8rem; border-bottom: 1px solid var(--line-soft); }
+  .dm-row:last-child { border-bottom: none; }
+  .dm-row input[type=checkbox] { width: 18px; height: 18px; accent-color: #8f6a14; }
+  .dm-row .dm-n, .dm-row select { width: 100%; min-width: 0; padding: 0.4rem 0.5rem; border: 1.5px solid #9d9580; border-radius: 6px; font-family: 'Inter'; font-size: 0.86rem; background: #fff; color: var(--ink); }
+  .dm-row .sz { font-size: 0.78rem; color: var(--ink-2); text-align: right; }
+  .dm-row .nota { grid-column: 2 / -1; font-size: 0.78rem; font-weight: 600; margin-top: -0.3rem; }
+  .dm-row.err { background: #fbeaea; }
+  .dm-row.off { opacity: 0.55; }
+  .dm-bar { height: 12px; background: var(--line-soft); border-radius: 6px; overflow: hidden; margin-top: 0.8rem; display: none; }
+  .dm-bar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .2s; }
+  @media (max-width: 700px) { .dm-row { grid-template-columns: 26px 1fr 30px; } .dm-row select, .dm-row .sz { grid-column: 2; text-align: left; } }
 </style>
 </head>
 <body>
@@ -617,7 +636,7 @@
 
       <!-- DOCS -->
       <section class="view" id="v-docs">
-        <div class="tbar"><h2>Archivo digital</h2><div class="r"><div class="lupa"><span class="lp">🔍</span><input id="doc-q" type="search" placeholder="Buscar cliente o documento…" autocomplete="off"></div><button class="btn btn-pri" id="addDoc">+ Documento</button></div></div>
+        <div class="tbar"><h2>Archivo digital</h2><div class="r"><div class="lupa"><span class="lp">🔍</span><input id="doc-q" type="search" placeholder="Buscar cliente o documento…" autocomplete="off"></div><button class="btn btn-soft" id="addDocMasa" title="Subir muchos archivos de un cliente de una sola vez">⇪ Carga masiva</button><button class="btn btn-pri" id="addDoc">+ Documento</button></div></div>
         <div class="docs-back" id="docs-back" style="display:none"><button class="btn btn-soft" id="doc-back">← Todos los clientes</button><h3 id="doc-cli-t"></h3><div id="doc-selbar"><label><input type="checkbox" id="doc-all"> Seleccionar todos</label><button class="btn btn-danger" id="doc-delsel" style="display:none"><span>🗑 Eliminar seleccionados (<span id="doc-delsel-n">0</span>)</span></button></div></div>
         <div class="docs" id="g-docs"></div>
       </section>
@@ -805,6 +824,28 @@
     <div class="fld" style="margin-bottom:0"><label>Vista previa</label><div class="prev" id="im-prev"><div class="empty" style="padding:1.2rem">Pegá las filas arriba para ver cómo se van a cargar.</div></div></div>
   </div>
   <div class="mf"><span class="sum" id="im-sum"></span><button class="btn btn-soft" data-close="m-imp">Cancelar</button><button class="btn btn-pri" id="im-ok" disabled>Importar</button></div>
+</div></div>
+
+<!-- MODAL CARGA MASIVA DE DOCUMENTOS -->
+<div class="ov" id="m-dmasa"><div class="modal xl">
+  <div class="mh"><h3>Carga masiva de documentos</h3><button class="x" data-close="m-dmasa">×</button></div>
+  <div class="mb">
+    <div class="fld"><label>Cliente al que pertenecen los documentos</label><select id="dm-c"></select></div>
+    <div class="dropzone" id="dm-drop" tabindex="0" role="button" aria-label="Elegir archivos">
+      <div class="big">📂</div>
+      <div><b>Arrastrá acá los archivos</b> o tocá para elegirlos</div>
+      <div style="font-size:0.82rem;margin-top:0.3rem">PDF, imágenes, Excel, CSV… podés elegir muchos a la vez. Máximo 9 MB por archivo.</div>
+      <input type="file" id="dm-file" multiple style="display:none">
+    </div>
+    <div id="dm-tools" style="display:none;margin-top:0.9rem;align-items:center;gap:0.6rem;flex-wrap:wrap">
+      <span style="font-size:0.85rem;font-weight:600">Tipo para todos:</span>
+      <select id="dm-tipo-all" style="padding:0.4rem 0.6rem;border:1.5px solid #9d9580;border-radius:6px;font-family:'Inter';font-size:0.86rem"><option value="">— elegir —</option><option>Balance</option><option>Recibo de sueldo</option><option>DDJJ</option><option>Factura</option><option>Comprobante</option><option>Extracto bancario</option><option>Otro</option></select>
+      <button class="btn btn-soft btn-sm" id="dm-vaciar" type="button">Quitar todos</button>
+    </div>
+    <div class="dm-list" id="dm-list" style="display:none"></div>
+    <div class="dm-bar" id="dm-bar"><i id="dm-bar-i"></i></div>
+  </div>
+  <div class="mf"><span class="sum" id="dm-sum"></span><button class="btn btn-soft" data-close="m-dmasa" id="dm-cancel">Cancelar</button><button class="btn btn-pri" id="dm-ok" disabled>Subir documentos</button></div>
 </div></div>
 
 <!-- MODAL DOC -->
@@ -1515,6 +1556,90 @@
     $('im-txt').value=t.replace(/^﻿/,''); $('im-file-info').textContent=file.name; renderImpPrev();
   }
 
+  // ── CARGA MASIVA DE DOCUMENTOS (muchos archivos de un cliente) ──
+  const MAX_DOC_BYTES = 9*1024*1024;
+  const TIPOS_DOC = ['Balance','Recibo de sueldo','DDJJ','Factura','Comprobante','Extracto bancario','Otro'];
+  const DM = { files:[], subiendo:false };
+  function adivinarTipoDoc(nombre){
+    const n=norm(nombre);
+    if(/balance/.test(n)) return 'Balance';
+    if(/recibo|sueldo|haberes/.test(n)) return 'Recibo de sueldo';
+    if(/ddjj|declaracion|jurada|f\.?931|931/.test(n)) return 'DDJJ';
+    if(/factura|fact[_\- ]/.test(n)) return 'Factura';
+    if(/extracto|resumen|movimientos|banco/.test(n)) return 'Extracto bancario';
+    if(/comprobante|ticket|pago/.test(n)) return 'Comprobante';
+    return 'Otro';
+  }
+  const tamTxt = b => b>=1048576 ? (b/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(b/1024))+' KB';
+  function docMasaModal(){
+    fillCli($('dm-c'));
+    $('dm-c').value = (DOC_CLI!==null && DOC_CLI!=='') ? DOC_CLI : '';
+    DM.files=[]; DM.subiendo=false; $('dm-file').value='';
+    $('dm-bar').style.display='none'; $('dm-bar-i').style.width='0';
+    renderDM(); openM('m-dmasa');
+  }
+  function agregarArchivosDM(lista){
+    [...lista].forEach(f=>{
+      if(DM.files.some(x=>x.file.name===f.name && x.file.size===f.size)) return;
+      const nombre=f.name.replace(/\.[^.]+$/,'');
+      DM.files.push({ file:f, nombre, tipo:adivinarTipoDoc(f.name), incluir:f.size<=MAX_DOC_BYTES, grande:f.size>MAX_DOC_BYTES, estado:'' });
+    });
+    marcarDuplicadosDM(); renderDM();
+  }
+  function marcarDuplicadosDM(){
+    const cli=$('dm-c').value;
+    const ex=new Set(DB.docs.filter(d=>(d.cli||'')===cli).map(d=>norm(d.nombre).trim()));
+    DM.files.forEach(x=>{ x.dup = ex.has(norm(x.nombre).trim()); });
+  }
+  function renderDM(){
+    const l=$('dm-list'), has=DM.files.length>0;
+    l.style.display = has?'block':'none'; $('dm-tools').style.display = has?'flex':'none';
+    l.innerHTML = DM.files.map((x,i)=>`<div class="dm-row ${x.grande?'err':''} ${x.incluir?'':'off'}">
+        <input type="checkbox" data-dm-i="${i}" ${x.incluir?'checked':''} ${x.grande?'disabled':''} aria-label="Incluir">
+        <input class="dm-n" data-dm-n="${i}" value="${esc(x.nombre)}" ${DM.subiendo?'disabled':''}>
+        <select data-dm-t="${i}" ${DM.subiendo?'disabled':''}>${TIPOS_DOC.map(t=>`<option ${t===x.tipo?'selected':''}>${t}</option>`).join('')}</select>
+        <span class="sz">${tamTxt(x.file.size)}</span>
+        <button class="ib" data-dm-x="${i}" title="Quitar" ${DM.subiendo?'disabled':''}>✕</button>
+        ${x.grande?`<div class="nota st-bad">Supera los 9 MB: no se puede subir</div>`:(x.estado==='ok'?`<div class="nota st-ok">✓ Subido</div>`:(x.estado==='error'?`<div class="nota st-bad">No se pudo subir</div>`:(x.dup?`<div class="nota st-warn">Ya hay un documento con este nombre en la carpeta</div>`:'')))}
+      </div>`).join('');
+    l.querySelectorAll('[data-dm-i]').forEach(c=>c.addEventListener('change',()=>{ DM.files[+c.dataset.dmI].incluir=c.checked; renderDM(); }));
+    l.querySelectorAll('[data-dm-n]').forEach(c=>c.addEventListener('input',()=>{ DM.files[+c.dataset.dmN].nombre=c.value; }));
+    l.querySelectorAll('[data-dm-n]').forEach(c=>c.addEventListener('change',()=>{ marcarDuplicadosDM(); renderDM(); }));
+    l.querySelectorAll('[data-dm-t]').forEach(c=>c.addEventListener('change',()=>{ DM.files[+c.dataset.dmT].tipo=c.value; }));
+    l.querySelectorAll('[data-dm-x]').forEach(c=>c.addEventListener('click',()=>{ DM.files.splice(+c.dataset.dmX,1); renderDM(); }));
+    const n=DM.files.filter(x=>x.incluir && x.estado!=='ok').length, bytes=DM.files.filter(x=>x.incluir && x.estado!=='ok').reduce((s,x)=>s+x.file.size,0);
+    $('dm-sum').textContent = has ? `${n} archivo${n===1?'':'s'} para subir · ${tamTxt(bytes)}` : '';
+    $('dm-ok').disabled = DM.subiendo || n===0;
+    $('dm-ok').textContent = n ? `Subir ${n} documento${n===1?'':'s'}` : 'Subir documentos';
+  }
+  async function subirDM(){
+    const cli=$('dm-c').value||null, pend=DM.files.filter(x=>x.incluir && x.estado!=='ok');
+    if(!pend.length) return;
+    if(pend.some(x=>!x.nombre.trim())){ toast('Hay documentos sin nombre'); return; }
+    DM.subiendo=true; renderDM(); $('dm-ok').disabled=true; $('dm-cancel').disabled=true;
+    $('dm-bar').style.display='block';
+    const hoy=isoLocal(new Date()); let ok=0, fail=0;
+    for(let i=0;i<pend.length;i++){
+      const x=pend[i];
+      $('dm-ok').textContent=`Subiendo ${i+1}/${pend.length}…`;
+      try{
+        const data={ nombre:x.nombre.trim(), tipo:x.tipo, cliente_id:cli, fecha:hoy,
+          archivo_data: await fileToBase64(x.file), archivo_mime: x.file.type||'application/octet-stream', archivo_nombre_original: x.file.name };
+        await api('/api/documentos','POST',data); x.estado='ok'; ok++;
+      }catch(e){ x.estado='error'; fail++; }
+      $('dm-bar-i').style.width = Math.round((i+1)/pend.length*100)+'%';
+    }
+    DM.subiendo=false; $('dm-cancel').disabled=false;
+    await loadAll();
+    if(!fail){
+      DOC_CLI = cli||''; SEL_DOC.clear(); renderAll(); closeM('m-dmasa');
+      toast(`${ok} documento${ok===1?'':'s'} subido${ok===1?'':'s'} ✓`);
+    } else {
+      renderAll(); DM.files=DM.files.filter(x=>x.estado!=='ok'); renderDM();
+      toast(`Se subieron ${ok}; ${fail} fallaron. Reintentá con los que quedan.`);
+    }
+  }
+
   // ── DOCS ──
 function docModal(){ fillCli($('di-c')); $('di-n').value=''; $('di-t').value='Balance'; $('di-f').value=''; $('di-f-info').textContent='Ningún archivo seleccionado'; openM('m-doc'); }
   $('di-f-btn').addEventListener('click', () => $('di-f').click());
@@ -1925,6 +2050,17 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   $('venDelBtn').addEventListener('click',async()=>{ const id=$('vi-id').value; if(!id) return; closeM('m-ven'); const ok=await venDel(id); if(!ok) openM('m-ven'); });
   $('venSave').addEventListener('click',venSave);
   $('addDoc').addEventListener('click',docModal);
+  $('addDocMasa').addEventListener('click',docMasaModal);
+  $('dm-drop').addEventListener('click',()=>$('dm-file').click());
+  $('dm-drop').addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); $('dm-file').click(); } });
+  $('dm-file').addEventListener('change',()=>{ agregarArchivosDM($('dm-file').files); $('dm-file').value=''; });
+  ['dragenter','dragover'].forEach(ev=>$('dm-drop').addEventListener(ev,e=>{ e.preventDefault(); $('dm-drop').classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev=>$('dm-drop').addEventListener(ev,e=>{ e.preventDefault(); $('dm-drop').classList.remove('over'); }));
+  $('dm-drop').addEventListener('drop',e=>{ if(e.dataTransfer && e.dataTransfer.files) agregarArchivosDM(e.dataTransfer.files); });
+  $('dm-c').addEventListener('change',()=>{ marcarDuplicadosDM(); renderDM(); });
+  $('dm-tipo-all').addEventListener('change',e=>{ if(e.target.value){ DM.files.forEach(x=>x.tipo=e.target.value); renderDM(); e.target.value=''; } });
+  $('dm-vaciar').addEventListener('click',()=>{ DM.files=[]; renderDM(); });
+  $('dm-ok').addEventListener('click',subirDM);
   $('doc-q').addEventListener('input', renderDocs);
   $('doc-delsel').addEventListener('click', docDelMulti);
   $('doc-all').addEventListener('change',e=>{ DOC_VISIBLES.forEach(id=>{ if(e.target.checked) SEL_DOC.add(id); else SEL_DOC.delete(id); }); document.querySelectorAll('[data-sel-doc]').forEach(cb=>cb.checked=e.target.checked); actualizarSelDoc(); });

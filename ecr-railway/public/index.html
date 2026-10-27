@@ -442,6 +442,29 @@
 
   body.no-edit #delSelVen, body.no-edit #venDelBtn, body.no-edit .dia-del { display: none !important; }
   .dia-del { flex: none; }
+
+  /* ─── Filtros tipo Excel (clientes) ─── */
+  .th-in { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .fbtn { border: 1.5px solid #9d9580; background: #fff; color: var(--ink); border-radius: 5px; width: 24px; height: 24px; font-size: 0.8rem; cursor: pointer; line-height: 1; padding: 0; }
+  .fbtn:hover { border-color: var(--gold); }
+  .fbtn.on { background: var(--gold); color: #fff; border-color: var(--gold); }
+  .fbar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.9rem; font-size: 0.88rem; color: var(--ink-2); }
+  .fchip { display: inline-flex; align-items: center; gap: 0.4rem; background: var(--gold-soft); border: 1.5px solid var(--gold); color: var(--ink); padding: 0.28rem 0.4rem 0.28rem 0.7rem; border-radius: 16px; font-weight: 600; }
+  .fchip button { border: none; background: rgba(0,0,0,.12); color: var(--ink); width: 20px; height: 20px; border-radius: 50%; cursor: pointer; font-size: 0.8rem; line-height: 1; }
+  #fpop { position: fixed; z-index: 150; width: 280px; background: #fff; border: 1.5px solid #9d9580; border-radius: 10px; box-shadow: var(--shadow-lg); display: none; }
+  #fpop.open { display: block; }
+  #fpop .fp-sec { padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--line-soft); }
+  #fpop .fp-sort { display: flex; flex-direction: column; gap: 0.3rem; }
+  #fpop .fp-sort button { text-align: left; border: none; background: none; padding: 0.45rem 0.5rem; border-radius: 6px; cursor: pointer; font-family: 'Inter'; font-size: 0.9rem; color: var(--ink); }
+  #fpop .fp-sort button:hover, #fpop .fp-sort button.on { background: var(--gold-soft); font-weight: 700; }
+  #fpop input[type=search], #fpop input[type=number] { width: 100%; padding: 0.5rem 0.7rem; border: 1.5px solid #9d9580; border-radius: 6px; font-family: 'Inter'; font-size: 0.9rem; }
+  #fpop .fp-list { max-height: 210px; overflow-y: auto; padding: 0.3rem 0.8rem; }
+  #fpop .fp-list label { display: flex; align-items: center; gap: 0.55rem; padding: 0.38rem 0; font-size: 0.92rem; color: var(--ink); cursor: pointer; }
+  #fpop .fp-list input { width: 18px; height: 18px; accent-color: #8f6a14; flex: none; }
+  #fpop .fp-list .n { margin-left: auto; color: var(--muted); font-size: 0.8rem; }
+  #fpop .fp-foot { display: flex; gap: 0.5rem; padding: 0.7rem 0.8rem; justify-content: space-between; }
+  #fpop .fp-two { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  #fpop .fp-all { font-weight: 700; border-bottom: 1px solid var(--line-soft); padding-bottom: 0.4rem; margin-bottom: 0.2rem; }
 </style>
 </head>
 <body>
@@ -531,8 +554,14 @@
           <button class="btn btn-danger" id="delSel" style="display:none"><span>🗑 Eliminar seleccionados (<span id="delSelN">0</span>)</span></button>
           <button class="btn btn-pri" id="addCli">+ Cliente</button>
         </div></div>
+        <div class="fbar" id="cli-fbar"></div>
         <div class="panel"><table>
-          <thead><tr><th class="selc"><input type="checkbox" id="cli-all" title="Seleccionar todos"></th><th>Empresa</th><th>CUIT</th><th>Servicio</th><th>Honorarios</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th class="selc"><input type="checkbox" id="cli-all" title="Seleccionar todos"></th>
+            <th><span class="th-in">Empresa <button class="fbtn" data-fcol="nombre" title="Filtrar y ordenar">▾</button></span></th>
+            <th><span class="th-in">CUIT <button class="fbtn" data-fcol="cuit" title="Filtrar por terminación del CUIT">▾</button></span></th>
+            <th><span class="th-in">Servicio <button class="fbtn" data-fcol="servicio" title="Filtrar y ordenar">▾</button></span></th>
+            <th><span class="th-in">Honorarios <button class="fbtn" data-fcol="honorarios" title="Filtrar y ordenar">▾</button></span></th>
+            <th><span class="th-in">Estado <button class="fbtn" data-fcol="estado" title="Filtrar y ordenar">▾</button></span></th><th></th></tr></thead>
           <tbody id="t-cli"></tbody>
         </table></div>
       </section>
@@ -746,6 +775,7 @@
   </div>
 </div></div>
 
+<div id="fpop"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -819,6 +849,9 @@
       aplicarAlcanceRol();
     }catch(e){ toast('No se pudo conectar con el servidor'); }
   }
+  // Último dígito del CUIT (de él depende la fecha de muchos vencimientos)
+  const terminacionCuit = c => { const d=String((c&&c.cuit)||'').replace(/\D/g,''); return d.length===11 ? d[10] : ''; };
+
   // ── COLORES: por tipo de vencimiento y por cliente ──
   const TIPO_COL = { 'Impositivo':'#1d4ed8', 'Laboral':'#c2410c', 'Previsional':'#7e22ce', 'Societario':'#047857' };
   const TIPO_CLS = { 'Impositivo':'imp', 'Laboral':'lab', 'Previsional':'prev', 'Societario':'soc' };
@@ -959,11 +992,102 @@
     toast(fallos ? `No se pudieron eliminar ${fallos} cliente(s)` : (ids.length===1?'Cliente eliminado':`${ids.length} clientes eliminados`));
   }
   function estChip(e){ const m={'Activo':'ok','En proceso':'warn','Inactivo':'dim'}; return `<span class="chip ${m[e]||'dim'}"><span class="dt"></span>${e}</span>`; }
+  // ── FILTROS TIPO EXCEL (Cartera de clientes) ──
+  const FCLI = { nombre:null, cuit:null, servicio:null, estado:null, honMin:null, honMax:null };
+  const SORT_CLI = { col:null, dir:1 };
+  const FCOL_LABEL = { nombre:'Empresa', cuit:'CUIT', servicio:'Servicio', honorarios:'Honorarios', estado:'Estado' };
+  function valorCol(c,col){ return col==='cuit' ? (terminacionCuit(c)||'—') : String(c[col]==null?'':c[col]); }
+  function etiquetaVal(col,v){ return col==='cuit' ? (v==='—' ? 'Sin CUIT válido' : 'Termina en '+v) : v; }
+  function filtrosActivos(){ return FCLI.nombre||FCLI.cuit||FCLI.servicio||FCLI.estado||FCLI.honMin!=null||FCLI.honMax!=null; }
+  function clientesFiltrados(){
+    let l = DB.clientes.filter(c=>{
+      for(const col of ['nombre','cuit','servicio','estado']) if(FCLI[col] && !FCLI[col].has(valorCol(c,col))) return false;
+      const h=+c.honorarios||0;
+      if(FCLI.honMin!=null && h<FCLI.honMin) return false;
+      if(FCLI.honMax!=null && h>FCLI.honMax) return false;
+      return true;
+    });
+    if(SORT_CLI.col){
+      const col=SORT_CLI.col, d=SORT_CLI.dir;
+      l=[...l].sort((a,b)=> col==='honorarios' ? d*((+a.honorarios||0)-(+b.honorarios||0)) : d*valorCol(a,col).localeCompare(valorCol(b,col),'es',{numeric:true}));
+    }
+    return l;
+  }
+  function renderFbar(){
+    const bar=$('cli-fbar'); if(!bar) return;
+    document.querySelectorAll('.fbtn').forEach(b=>{
+      const c=b.dataset.fcol;
+      b.classList.toggle('on', c==='honorarios' ? (FCLI.honMin!=null||FCLI.honMax!=null) : !!FCLI[c] || SORT_CLI.col===c);
+    });
+    const chips=[];
+    ['nombre','cuit','servicio','estado'].forEach(c=>{ if(FCLI[c]){ const v=[...FCLI[c]]; chips.push(`<span class="fchip">${FCOL_LABEL[c]}: ${esc(v.length>2? v.length+' seleccionados' : v.map(x=>etiquetaVal(c,x)).join(', '))}<button data-fquit="${c}" aria-label="Quitar filtro">×</button></span>`); } });
+    if(FCLI.honMin!=null||FCLI.honMax!=null) chips.push(`<span class="fchip">Honorarios: ${FCLI.honMin!=null?'desde '+money(FCLI.honMin):''} ${FCLI.honMax!=null?'hasta '+money(FCLI.honMax):''}<button data-fquit="honorarios" aria-label="Quitar filtro">×</button></span>`);
+    const total=DB.clientes.length, n=clientesFiltrados().length;
+    bar.innerHTML = (chips.length||SORT_CLI.col) ? `<b>Mostrando ${n} de ${total}</b>${chips.join('')}<button class="btn btn-soft btn-sm" id="fclear">Quitar todos los filtros</button>` : '';
+    bar.querySelectorAll('[data-fquit]').forEach(b=>b.addEventListener('click',()=>{ const c=b.dataset.fquit; if(c==='honorarios'){FCLI.honMin=null;FCLI.honMax=null;} else FCLI[c]=null; renderCli(); }));
+    const fc=$('fclear'); if(fc) fc.addEventListener('click',limpiarFiltrosCli);
+  }
+  function limpiarFiltrosCli(){ FCLI.nombre=FCLI.cuit=FCLI.servicio=FCLI.estado=null; FCLI.honMin=FCLI.honMax=null; SORT_CLI.col=null; renderCli(); }
+  let fpopCol = null;
+  function cerrarFpop(){ $('fpop').classList.remove('open'); fpopCol=null; }
+  function abrirFpop(col, btn){
+    if(fpopCol===col){ cerrarFpop(); return; }
+    fpopCol=col;
+    const pop=$('fpop');
+    const sortBtns = col==='honorarios'
+      ? [['1','↑ Menor a mayor'],['-1','↓ Mayor a menor']]
+      : [['1','↑ Ordenar A → Z'],['-1','↓ Ordenar Z → A']];
+    let html = `<div class="fp-sec fp-sort">${sortBtns.map(([d,t])=>`<button data-fsort="${d}" class="${SORT_CLI.col===col&&String(SORT_CLI.dir)===d?'on':''}">${t}</button>`).join('')}</div>`;
+    if(col==='honorarios'){
+      html += `<div class="fp-sec"><div class="fp-two"><div><label style="font-size:0.78rem;font-weight:600">Desde ($)</label><input type="number" id="fp-min" min="0" value="${FCLI.honMin!=null?FCLI.honMin:''}"></div><div><label style="font-size:0.78rem;font-weight:600">Hasta ($)</label><input type="number" id="fp-max" min="0" value="${FCLI.honMax!=null?FCLI.honMax:''}"></div></div></div>`;
+    } else {
+      const cnt={}; DB.clientes.forEach(c=>{ const v=valorCol(c,col); cnt[v]=(cnt[v]||0)+1; });
+      const vals=Object.keys(cnt).sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
+      const sel = FCLI[col] || new Set(vals);
+      html += `<div class="fp-sec"><input type="search" id="fp-q" placeholder="Buscar…" autocomplete="off"></div>
+        <div class="fp-list" id="fp-list"><label class="fp-all"><input type="checkbox" id="fp-all"> (Seleccionar todo)</label>${vals.map(v=>`<label data-v="${esc(v)}" data-t="${esc(etiquetaVal(col,v).toLowerCase())}"><input type="checkbox" data-fv="${esc(v)}" ${sel.has(v)?'checked':''}> ${esc(etiquetaVal(col,v))}<span class="n">${cnt[v]}</span></label>`).join('')}</div>`;
+    }
+    html += `<div class="fp-foot"><button class="btn btn-soft btn-sm" id="fp-clear">Quitar filtro</button><button class="btn btn-pri btn-sm" id="fp-ok">Aceptar</button></div>`;
+    pop.innerHTML = html;
+    const r=btn.getBoundingClientRect();
+    pop.style.left = Math.max(8, Math.min(window.innerWidth-296, r.left-10))+'px';
+    pop.style.top = (r.bottom+6)+'px';
+    pop.classList.add('open');
+    pop.querySelectorAll('[data-fsort]').forEach(b=>b.addEventListener('click',()=>{ SORT_CLI.col=col; SORT_CLI.dir=+b.dataset.fsort; cerrarFpop(); renderCli(); }));
+    if(col!=='honorarios'){
+      const all=$('fp-all'), items=()=>[...pop.querySelectorAll('[data-fv]')];
+      const vis=()=>items().filter(i=>i.closest('label').style.display!=='none');
+      const sync=()=>{ const v=vis(), m=v.filter(i=>i.checked).length; all.checked=v.length>0&&m===v.length; all.indeterminate=m>0&&m<v.length; };
+      sync();
+      all.addEventListener('change',()=>{ vis().forEach(i=>i.checked=all.checked); sync(); });
+      items().forEach(i=>i.addEventListener('change',sync));
+      $('fp-q').addEventListener('input',e=>{ const q=norm(e.target.value); pop.querySelectorAll('#fp-list label[data-v]').forEach(l=>{ l.style.display = norm(l.dataset.t).includes(q) ? '' : 'none'; }); sync(); });
+      $('fp-ok').addEventListener('click',()=>{
+        const base = $('fp-q').value.trim() ? vis() : items();   // con texto en la búsqueda, filtra solo por lo que coincide (como Excel)
+        const marc=base.filter(i=>i.checked).map(i=>i.dataset.fv);
+        FCLI[col] = marc.length===items().length ? null : new Set(marc);
+        cerrarFpop(); renderCli();
+      });
+      $('fp-clear').addEventListener('click',()=>{ FCLI[col]=null; if(SORT_CLI.col===col) SORT_CLI.col=null; cerrarFpop(); renderCli(); });
+      setTimeout(()=>{ try{ $('fp-q').focus(); }catch(e){} },30);
+    } else {
+      $('fp-ok').addEventListener('click',()=>{ const a=$('fp-min').value, b=$('fp-max').value; FCLI.honMin=a===''?null:+a; FCLI.honMax=b===''?null:+b; cerrarFpop(); renderCli(); });
+      $('fp-clear').addEventListener('click',()=>{ FCLI.honMin=FCLI.honMax=null; if(SORT_CLI.col===col) SORT_CLI.col=null; cerrarFpop(); renderCli(); });
+    }
+  }
+  document.querySelectorAll('.fbtn').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); abrirFpop(b.dataset.fcol,b); }));
+  document.addEventListener('click',e=>{ if(fpopCol && !e.target.closest('#fpop')) cerrarFpop(); });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') cerrarFpop(); });
+  window.addEventListener('resize',cerrarFpop);
+
   function renderCli(){
     const t=$('t-cli');
-    [...SEL_CLI].forEach(id=>{ if(!DB.clientes.some(c=>c.id===id)) SEL_CLI.delete(id); });
+    const lista = clientesFiltrados();
+    [...SEL_CLI].forEach(id=>{ if(!lista.some(c=>c.id===id)) SEL_CLI.delete(id); });   // nunca queda marcado algo que el filtro oculta
+    renderFbar();
+    if(DB.clientes.length && !lista.length){ t.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="e">▤</div>Ningún cliente coincide con los filtros. <button class="btn btn-soft btn-sm" id="fclear2" style="margin-left:0.6rem">Quitar filtros</button></div></td></tr>`; $('fclear2').addEventListener('click',limpiarFiltrosCli); actualizarSel(); return; }
     if(!DB.clientes.length){ t.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="e">▤</div>Sin clientes cargados. Agregá el primero con el botón "+ Cliente".</div></td></tr>`; actualizarSel(); return; }
-    t.innerHTML = DB.clientes.map(c=>`<tr>
+    t.innerHTML = lista.map(c=>`<tr>
       <td class="selc"><input type="checkbox" data-sel-cli="${c.id}" ${SEL_CLI.has(c.id)?'checked':''} aria-label="Seleccionar ${esc(c.nombre)}"></td>
       <td><div class="nm">${esc(c.nombre)}</div></td>
       <td><span class="mono">${esc(c.cuit||'—')}</span></td>

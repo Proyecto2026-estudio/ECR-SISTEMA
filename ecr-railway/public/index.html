@@ -523,8 +523,8 @@
       <div class="menu-i" data-v="ajustes"><span class="mi">⚙</span> Configuración</div>
     </nav>
     <div class="side-foot">
-      <div class="pf">GC</div>
-      <div><strong>Gabriel Casil</strong><span>Titular · 50 años de trayectoria</span></div>
+      <div class="pf" id="sideAvatar">--</div>
+      <div><strong id="sideNombre">Cargando…</strong><span id="sideRol"></span></div>
     </div>
   </aside>
 
@@ -2006,6 +2006,9 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
       $('userRol').textContent = ROL_LABEL[usuario.rol] || usuario.rol;
       const iniciales = usuario.nombre.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase();
       $('userAvatar').textContent = iniciales;
+      $('sideNombre').textContent = usuario.nombre;
+      $('sideRol').textContent = ROL_LABEL[usuario.rol] || usuario.rol;
+      $('sideAvatar').textContent = iniciales;
     }
     const menu = $('userMenu'), dropdown = $('userDropdown');
     menu.addEventListener('click', e => { dropdown.classList.toggle('open'); e.stopPropagation(); });

@@ -465,6 +465,31 @@
   #fpop .fp-foot { display: flex; gap: 0.5rem; padding: 0.7rem 0.8rem; justify-content: space-between; }
   #fpop .fp-two { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
   #fpop .fp-all { font-weight: 700; border-bottom: 1px solid var(--line-soft); padding-bottom: 0.4rem; margin-bottom: 0.2rem; }
+
+  /* ─── Vencimientos por lote / carga masiva ─── */
+  body.no-edit #addLote, body.no-edit #addImp { display: none !important; }
+  .modal.xl { width: 780px; }
+  .cl-list { max-height: 220px; overflow-y: auto; border: 1.5px solid #9d9580; border-radius: 8px; padding: 0.3rem 0.8rem; background: #fff; }
+  .cl-list label { display: flex; align-items: center; gap: 0.6rem; padding: 0.42rem 0; cursor: pointer; font-size: 0.93rem; color: var(--ink); border-bottom: 1px solid var(--line-soft); }
+  .cl-list label:last-child { border-bottom: none; }
+  .cl-list input { width: 18px; height: 18px; accent-color: #8f6a14; flex: none; }
+  .cl-list .cu { margin-left: auto; color: var(--ink-2); font-size: 0.82rem; white-space: nowrap; }
+  .term-chips { display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center; }
+  .tchip { border: 1.5px solid #9d9580; background: #fff; border-radius: 16px; padding: 0.25rem 0.7rem; font-weight: 700; cursor: pointer; font-size: 0.85rem; color: var(--ink); font-family: 'Inter'; }
+  .tchip:hover { border-color: var(--gold); }
+  .tchip.on { background: var(--gold); color: #fff; border-color: var(--gold); }
+  .dig-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 0.6rem; margin-top: 0.6rem; }
+  .dig-row { display: flex; align-items: center; gap: 0.5rem; background: var(--panel-2); border: 1.5px solid var(--line); border-radius: 8px; padding: 0.45rem 0.6rem; }
+  .dig-row b { min-width: 74px; font-size: 0.85rem; color: var(--ink); }
+  .dig-row input { flex: 1; min-width: 150px; padding: 0.4rem 0.5rem; border: 1.5px solid #9d9580; border-radius: 6px; font-family: 'Inter'; font-size: 0.88rem; }
+  .prev { max-height: 250px; overflow: auto; border: 1.5px solid var(--line); border-radius: 8px; background: #fff; }
+  .prev table { font-size: 0.86rem; }
+  .prev th, .prev td { padding: 0.5rem 0.8rem !important; }
+  .st-ok { color: var(--green); font-weight: 700; } .st-warn { color: var(--amber); font-weight: 700; } .st-bad { color: var(--red); font-weight: 700; }
+  .helpbox { background: var(--gold-soft); border: 1.5px solid var(--gold); border-radius: 8px; padding: 0.75rem 0.9rem; font-size: 0.86rem; color: var(--ink); line-height: 1.6; margin-bottom: 1rem; }
+  .helpbox code { background: rgba(255,255,255,.7); padding: 0.05rem 0.35rem; border-radius: 4px; }
+  textarea.big { width: 100%; min-height: 130px; padding: 0.7rem 0.8rem; border: 1.5px solid #9d9580; border-radius: 8px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.85rem; background: var(--bg-soft); color: var(--ink); resize: vertical; }
+  .mf .sum { margin-right: auto; font-size: 0.88rem; font-weight: 600; color: var(--ink-2); align-self: center; }
 </style>
 </head>
 <body>
@@ -571,6 +596,8 @@
         <div class="tbar"><h2>Agenda de vencimientos</h2><div class="r">
           <div class="seg"><button class="on" id="sg-cal">Calendario</button><button id="sg-list">Lista</button></div>
           <button class="btn btn-danger" id="delSelVen" style="display:none"><span>🗑 Eliminar seleccionados (<span id="delSelVenN">0</span>)</span></button>
+          <button class="btn btn-soft" id="addImp" title="Cargar muchos vencimientos de una vez pegando desde Excel o con un archivo">⇪ Carga masiva</button>
+          <button class="btn btn-soft" id="addLote" title="Un mismo vencimiento para varios clientes">+ Varios clientes</button>
           <button class="btn btn-pri" id="addVen">+ Vencimiento</button>
         </div></div>
         <div id="ag-cal">
@@ -724,6 +751,64 @@
   <div class="mh"><h3 id="dia-t">Vencimientos del día</h3><button class="x" data-close="m-dia">×</button></div>
   <div class="mb" id="dia-b"></div>
   <div class="mf"><button class="btn btn-soft" data-close="m-dia">Cerrar</button><button class="btn btn-pri" id="dia-add">+ Agregar vencimiento</button></div>
+</div></div>
+
+<!-- MODAL VENCIMIENTO PARA VARIOS CLIENTES -->
+<div class="ov" id="m-lote"><div class="modal xl">
+  <div class="mh"><h3>Vencimiento para varios clientes</h3><button class="x" data-close="m-lote">×</button></div>
+  <div class="mb">
+    <div class="frow">
+      <div class="fld"><label>Descripción</label><input id="lo-d" placeholder="Presentación IVA"></div>
+      <div class="fld"><label>Tipo</label><div class="selrow"><span class="sw sq" id="lo-tsw"></span><select id="lo-t"><option>Impositivo</option><option>Laboral</option><option>Previsional</option><option>Societario</option></select></div></div>
+    </div>
+    <div class="fld">
+      <label>Clientes a los que se les carga</label>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;margin-bottom:0.6rem">
+        <input id="lo-q" type="search" placeholder="Buscar cliente…" autocomplete="off" style="flex:1;min-width:160px">
+        <button class="btn btn-soft btn-sm" id="lo-todos" type="button">Marcar todos</button>
+        <button class="btn btn-soft btn-sm" id="lo-ninguno" type="button">Quitar todos</button>
+      </div>
+      <div style="margin-bottom:0.6rem"><div style="font-size:0.8rem;color:var(--ink-2);margin-bottom:0.3rem">Marcar por terminación del CUIT:</div><div class="term-chips" id="lo-term"></div></div>
+      <div class="cl-list" id="lo-list"></div>
+      <div id="lo-count" style="font-size:0.82rem;color:var(--ink-2);margin-top:0.35rem"></div>
+    </div>
+    <div class="fld">
+      <label>Fecha de vencimiento</label>
+      <div class="seg" style="display:inline-flex;margin-bottom:0.6rem"><button type="button" class="on" id="lo-m1">La misma fecha para todos</button><button type="button" id="lo-m2">Según el último dígito del CUIT</button></div>
+      <div id="lo-f1"><input type="date" id="lo-fecha"></div>
+      <div id="lo-f2" style="display:none">
+        <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;cursor:pointer"><input type="checkbox" id="lo-pares" checked style="width:18px;height:18px;accent-color:#8f6a14"> Agrupar de a pares (0-1, 2-3, 4-5, 6-7, 8-9)</label>
+        <div class="dig-grid" id="lo-digs"></div>
+      </div>
+    </div>
+    <div class="fld"><label>Estado</label><select id="lo-e"><option>Pendiente</option><option>En proceso</option><option>Cumplido</option></select></div>
+    <div class="fld" style="margin-bottom:0"><label>Vista previa</label><div class="prev" id="lo-prev"></div></div>
+  </div>
+  <div class="mf"><span class="sum" id="lo-sum"></span><button class="btn btn-soft" data-close="m-lote">Cancelar</button><button class="btn btn-pri" id="lo-ok">Crear vencimientos</button></div>
+</div></div>
+
+<!-- MODAL CARGA MASIVA -->
+<div class="ov" id="m-imp"><div class="modal xl">
+  <div class="mh"><h3>Carga masiva de vencimientos</h3><button class="x" data-close="m-imp">×</button></div>
+  <div class="mb">
+    <div class="helpbox">
+      Pegá las filas desde <b>Excel</b> (o elegí un archivo <b>.csv</b>). Una fila por vencimiento, con estas columnas:<br>
+      <b>Descripción · Tipo · Terminación · Fecha · Cliente</b><br>
+      • <b>Terminación</b>: el último dígito del CUIT (<code>3</code>), varios (<code>0-1</code> o <code>0,1</code>). Se carga a todos los clientes activos que terminen así.<br>
+      • <b>Cliente</b> (opcional): nombre o CUIT. Si lo completás, el vencimiento es solo para ese cliente. Si dejás ambos vacíos, es un vencimiento general del estudio.<br>
+      • <b>Fecha</b>: <code>18/11/2026</code> o <code>2026-11-18</code>. <b>Tipo</b>: Impositivo, Laboral, Previsional o Societario.
+    </div>
+    <div class="fld"><textarea class="big" id="im-txt" placeholder="IVA mensual&#9;Impositivo&#9;0-1&#9;18/11/2026&#10;IVA mensual&#9;Impositivo&#9;2-3&#9;19/11/2026&#10;F931 cargas sociales&#9;Laboral&#9;&#9;09/11/2026&#9;Panadería La Espiga"></textarea></div>
+    <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+      <input type="file" id="im-file" accept=".csv,.txt,.tsv" style="display:none">
+      <button type="button" class="btn btn-soft btn-sm" id="im-pick">📎 Elegir archivo CSV</button>
+      <button type="button" class="btn btn-soft btn-sm" id="im-plantilla">⬇ Descargar plantilla para Excel</button>
+      <span id="im-file-info" style="font-size:0.82rem;color:var(--ink-2)"></span>
+    </div>
+    <div class="fld"><label>Estado de los vencimientos cargados</label><select id="im-e"><option>Pendiente</option><option>En proceso</option><option>Cumplido</option></select></div>
+    <div class="fld" style="margin-bottom:0"><label>Vista previa</label><div class="prev" id="im-prev"><div class="empty" style="padding:1.2rem">Pegá las filas arriba para ver cómo se van a cargar.</div></div></div>
+  </div>
+  <div class="mf"><span class="sum" id="im-sum"></span><button class="btn btn-soft" data-close="m-imp">Cancelar</button><button class="btn btn-pri" id="im-ok" disabled>Importar</button></div>
 </div></div>
 
 <!-- MODAL DOC -->
@@ -1230,6 +1315,210 @@
     openM('m-dia');
   }
 
+  // ── VENCIMIENTOS EN LOTE Y CARGA MASIVA ──
+  const TIPOS_VEN = ['Impositivo','Laboral','Previsional','Societario'];
+  const fechaAR = iso => { const [y,m,d]=String(iso).slice(0,10).split('-'); return `${d}/${m}/${y}`; };
+  const claveVen = (cli,desc,fecha) => `${cli||''}|${norm(desc).trim()}|${String(fecha).slice(0,10)}`;
+  function clavesExistentes(){ return new Set(DB.venc.map(v=>claveVen(v.cli,v.desc,v.fecha))); }
+  // Crea los vencimientos de a 5 por vez para no saturar el servidor
+  async function crearVencimientos(items, btn, textoBtn){
+    let ok=0, fail=0;
+    for(let i=0;i<items.length;i+=5){
+      const res = await Promise.allSettled(items.slice(i,i+5).map(it=>api('/api/vencimientos','POST',it)));
+      res.forEach(r=> r.status==='fulfilled' ? ok++ : fail++);
+      if(btn) btn.textContent = `Creando… ${ok+fail}/${items.length}`;
+    }
+    if(btn) btn.textContent = textoBtn;
+    return {ok,fail};
+  }
+  async function terminarCarga(r, modalId){
+    await loadAll(); renderAll();
+    closeM(modalId);
+    toast(r.fail ? `Se crearon ${r.ok}; fallaron ${r.fail}` : `${r.ok} vencimiento${r.ok===1?'':'s'} creado${r.ok===1?'':'s'} ✓`);
+  }
+
+  // --- Un vencimiento para varios clientes ---
+  const LOTE = { sel:new Set(), modo:1, dig:Array(10).fill(''), pares:true };
+  const clientesOrdenados = () => [...DB.clientes].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  function loteModal(){
+    LOTE.sel.clear(); LOTE.modo=1; LOTE.dig=Array(10).fill(''); LOTE.pares=true;
+    $('lo-d').value=''; $('lo-t').value='Impositivo'; $('lo-e').value='Pendiente'; $('lo-q').value=''; $('lo-pares').checked=true;
+    $('lo-fecha').value = new Date(Date.now()+5*864e5).toISOString().slice(0,10);
+    $('lo-tsw').style.background = TIPO_COL['Impositivo'];
+    setLoteModo(1); renderLoteList(); renderLoteTerm(); renderLoteDigs(); renderLotePrev();
+    openM('m-lote');
+  }
+  function setLoteModo(m){
+    LOTE.modo=m;
+    $('lo-m1').classList.toggle('on',m===1); $('lo-m2').classList.toggle('on',m===2);
+    $('lo-f1').style.display = m===1?'':'none'; $('lo-f2').style.display = m===2?'':'none';
+    renderLotePrev();
+  }
+  function renderLoteList(){
+    const q=norm($('lo-q').value.trim());
+    const l=clientesOrdenados().filter(c=>!q || norm(c.nombre).includes(q) || String(c.cuit||'').includes(q));
+    $('lo-list').innerHTML = l.length ? l.map(c=>{ const t=terminacionCuit(c);
+      return `<label><input type="checkbox" data-lo-c="${c.id}" ${LOTE.sel.has(c.id)?'checked':''}><span class="evdot" style="--cc:${cliColor(c.id)}"></span><span>${esc(c.nombre)}${c.estado==='Inactivo'?' <i style="color:var(--muted)">(inactivo)</i>':''}</span><span class="cu">${esc(c.cuit||'sin CUIT')}${t!==''?` · termina en <b>${t}</b>`:''}</span></label>`; }).join('')
+      : '<div class="empty" style="padding:1rem">No hay clientes que coincidan.</div>';
+    $('lo-list').querySelectorAll('[data-lo-c]').forEach(cb=>cb.addEventListener('change',()=>{ if(cb.checked) LOTE.sel.add(cb.dataset.loC); else LOTE.sel.delete(cb.dataset.loC); renderLoteTerm(); renderLotePrev(); }));
+    $('lo-count').textContent = `${LOTE.sel.size} de ${DB.clientes.length} clientes marcados`;
+  }
+  function renderLoteTerm(){
+    const cnt={}; DB.clientes.forEach(c=>{ const t=terminacionCuit(c); cnt[t]=(cnt[t]||0)+1; });
+    let h='';
+    for(let d=0;d<=9;d++){
+      const ids=DB.clientes.filter(c=>terminacionCuit(c)===String(d)).map(c=>c.id);
+      const todos = ids.length>0 && ids.every(i=>LOTE.sel.has(i));
+      h += `<button type="button" class="tchip ${todos?'on':''}" data-lo-t="${d}" ${ids.length?'':'disabled style="opacity:.45;cursor:default"'}>${d} <span style="font-weight:500">(${ids.length})</span></button>`;
+    }
+    $('lo-term').innerHTML=h;
+    $('lo-term').querySelectorAll('[data-lo-t]:not([disabled])').forEach(b=>b.addEventListener('click',()=>{
+      const ids=DB.clientes.filter(c=>terminacionCuit(c)===b.dataset.loT).map(c=>c.id);
+      const todos=ids.every(i=>LOTE.sel.has(i));
+      ids.forEach(i=> todos ? LOTE.sel.delete(i) : LOTE.sel.add(i));
+      renderLoteList(); renderLoteTerm(); renderLotePrev();
+    }));
+    $('lo-count').textContent = `${LOTE.sel.size} de ${DB.clientes.length} clientes marcados`;
+  }
+  function renderLoteDigs(){
+    const grupos = LOTE.pares ? [[0,1],[2,3],[4,5],[6,7],[8,9]] : [0,1,2,3,4,5,6,7,8,9].map(d=>[d]);
+    $('lo-digs').innerHTML = grupos.map(g=>`<div class="dig-row"><b>Termina en ${g.join(' y ')}</b><input type="date" data-lo-dig="${g.join(',')}" value="${LOTE.dig[g[0]]||''}"></div>`).join('');
+    $('lo-digs').querySelectorAll('[data-lo-dig]').forEach(i=>i.addEventListener('change',()=>{ i.dataset.loDig.split(',').forEach(d=>{ LOTE.dig[+d]=i.value; }); renderLotePrev(); }));
+  }
+  function loteItems(){
+    const desc=$('lo-d').value.trim(), tipo=$('lo-t').value, estado=$('lo-e').value, ex=clavesExistentes();
+    const filas=[];
+    clientesOrdenados().filter(c=>LOTE.sel.has(c.id)).forEach(c=>{
+      const t=terminacionCuit(c);
+      let fecha = LOTE.modo===1 ? $('lo-fecha').value : (t!=='' ? LOTE.dig[+t] : '');
+      let st='ok', msg='Se crea';
+      if(LOTE.modo===2 && t==='') { st='bad'; msg='CUIT sin dígito válido'; }
+      else if(!fecha) { st='bad'; msg='Falta la fecha'; }
+      else if(desc && ex.has(claveVen(c.id,desc,fecha))) { st='warn'; msg='Ya existe, se omite'; }
+      filas.push({c,t,fecha,st,msg,item:{descripcion:desc,cliente_id:c.id,tipo,fecha,estado}});
+    });
+    return filas;
+  }
+  function renderLotePrev(){
+    const f=loteItems(), crear=f.filter(x=>x.st==='ok').length;
+    $('lo-prev').innerHTML = f.length ? `<table><thead><tr><th>Cliente</th><th>CUIT</th><th>Fecha</th><th></th></tr></thead><tbody>${f.map(x=>`<tr><td><span style="display:inline-flex;align-items:center;gap:0.5rem"><span class="evdot" style="--cc:${cliColor(x.c.id)}"></span>${esc(x.c.nombre)}</span></td><td>${esc(x.c.cuit||'—')}${x.t!==''?` <small>(${x.t})</small>`:''}</td><td>${x.fecha?fechaAR(x.fecha):'—'}</td><td class="st-${x.st}">${x.msg}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="empty" style="padding:1.2rem">Marcá uno o más clientes para ver cómo queda.</div>';
+    $('lo-sum').textContent = f.length ? `Se van a crear ${crear} de ${f.length}` : '';
+    $('lo-ok').disabled = crear===0;
+  }
+  async function loteGuardar(){
+    if(!$('lo-d').value.trim()){ toast('Escribí la descripción del vencimiento'); return; }
+    const items=loteItems().filter(x=>x.st==='ok').map(x=>x.item);
+    if(!items.length){ toast('No hay nada para crear'); return; }
+    const btn=$('lo-ok'); btn.disabled=true;
+    const r=await crearVencimientos(items,btn,'Crear vencimientos');
+    btn.disabled=false; await terminarCarga(r,'m-lote');
+  }
+
+  // --- Carga masiva (pegar desde Excel o archivo CSV) ---
+  function splitFila(line, d){
+    const out=[]; let cur='', q=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(q){ if(ch==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+      else if(ch==='"') q=true;
+      else if(ch===d){ out.push(cur); cur=''; }
+      else cur+=ch;
+    }
+    out.push(cur); return out.map(x=>x.trim());
+  }
+  function parseFecha(sv){
+    sv=String(sv||'').trim(); let y,m,d,x;
+    if((x=sv.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/))){ y=+x[1]; m=+x[2]; d=+x[3]; }
+    else if((x=sv.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/))){ d=+x[1]; m=+x[2]; y=+x[3]; if(y<100) y+=2000; }
+    else return '';
+    const dt=new Date(y,m-1,d); if(dt.getFullYear()!==y||dt.getMonth()!==m-1||dt.getDate()!==d) return '';
+    return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+  function normTipo(t){ const n=norm(t); if(n.startsWith('imp')) return 'Impositivo'; if(n.startsWith('lab')) return 'Laboral'; if(n.startsWith('prev')) return 'Previsional'; if(n.startsWith('soc')) return 'Societario'; return ''; }
+  function buscarCliente(txt){
+    const dig=String(txt).replace(/\D/g,'');
+    if(dig.length===11){ const c=DB.clientes.filter(x=>String(x.cuit||'').replace(/\D/g,'')===dig); if(c.length===1) return {c:c[0]}; }
+    const n=norm(txt).trim();
+    const exact=DB.clientes.filter(x=>norm(x.nombre).trim()===n); if(exact.length===1) return {c:exact[0]};
+    const parc=DB.clientes.filter(x=>norm(x.nombre).includes(n)); if(parc.length===1) return {c:parc[0]};
+    return {error: parc.length>1 ? 'Hay varios clientes con ese nombre' : 'No se encontró el cliente'};
+  }
+  function parseImport(texto){
+    const lineas=String(texto||'').split(/\r?\n/).filter(l=>l.trim());
+    if(!lineas.length) return [];
+    const d = lineas.some(l=>l.includes('\t')) ? '\t' : (lineas[0].includes(';') ? ';' : ',');
+    let filas=lineas.map(l=>splitFila(l,d));
+    let idx={desc:0,tipo:1,term:2,fecha:3,cli:4};
+    const cab=filas[0].map(x=>norm(x));
+    if(cab.some(x=>/descrip|tipo|fecha|termin|cliente/.test(x)) && !filas[0].some(x=>parseFecha(x))){
+      const f=(re)=>cab.findIndex(x=>re.test(x));
+      idx={desc:f(/descrip|vencim|concepto/),tipo:f(/^tipo/),term:f(/termin|digito/),fecha:f(/fecha/),cli:f(/cliente|cuit|empresa/)};
+      filas=filas.slice(1);
+    }
+    const g=(r,k)=> idx[k]>=0 ? (r[idx[k]]||'') : '';
+    const ex=clavesExistentes(), vistos=new Set();
+    return filas.map((r,n)=>{
+      const desc=g(r,'desc').trim(), tipoTxt=g(r,'tipo'), term=g(r,'term').trim(), fTxt=g(r,'fecha'), cliTxt=g(r,'cli').trim();
+      const o={n:n+1, desc, tipo:normTipo(tipoTxt), fecha:parseFecha(fTxt), term, cliTxt, items:[], err:'', aviso:''};
+      if(!desc) o.err='Falta la descripción';
+      else if(!o.tipo) o.err = tipoTxt ? `Tipo "${tipoTxt}" no válido` : 'Falta el tipo';
+      else if(!o.fecha) o.err = fTxt ? `Fecha "${fTxt}" no válida` : 'Falta la fecha';
+      if(!o.err){
+        let objetivo=[];
+        if(cliTxt){ const b=buscarCliente(cliTxt); if(b.error) o.err=b.error+` ("${cliTxt}")`; else objetivo=[b.c]; }
+        else if(term){
+          const dg=[...new Set((term.match(/\d/g)||[]))];
+          if(!dg.length) o.err=`Terminación "${term}" no válida`;
+          else { objetivo=DB.clientes.filter(c=>c.estado!=='Inactivo' && dg.includes(terminacionCuit(c))); if(!objetivo.length) o.err=`Ningún cliente activo termina en ${dg.join(', ')}`; }
+        } else objetivo=[null];
+        let dup=0;
+        objetivo.forEach(c=>{
+          const k=claveVen(c?c.id:'',desc,o.fecha);
+          if(ex.has(k)||vistos.has(k)){ dup++; return; }
+          vistos.add(k);
+          o.items.push({descripcion:desc,cliente_id:c?c.id:null,tipo:o.tipo,fecha:o.fecha,estado:'Pendiente',_c:c});
+        });
+        if(dup) o.aviso = `${dup} ya existía${dup>1?'n':''} y se omite${dup>1?'n':''}`;
+        if(!o.err && !o.items.length && !dup) o.err='No hay nada para crear';
+      }
+      return o;
+    });
+  }
+  let IMP_ITEMS=[];
+  function renderImpPrev(){
+    const filas=parseImport($('im-txt').value);
+    const box=$('im-prev');
+    IMP_ITEMS = filas.flatMap(f=>f.items);
+    if(!filas.length){ box.innerHTML='<div class="empty" style="padding:1.2rem">Pegá las filas arriba para ver cómo se van a cargar.</div>'; $('im-sum').textContent=''; $('im-ok').disabled=true; $('im-ok').textContent='Importar'; return; }
+    box.innerHTML = `<table><thead><tr><th>#</th><th>Vencimiento</th><th>Fecha</th><th>Se carga a</th><th></th></tr></thead><tbody>${filas.map(f=>{
+      const dest = f.err ? '—' : (f.items.length ? (f.items.length===1 ? (f.items[0]._c?esc(f.items[0]._c.nombre):'General del estudio') : `${f.items.length} clientes`) : '—');
+      const st = f.err ? `<span class="st-bad">${esc(f.err)}</span>` : (f.aviso ? `<span class="st-warn">${esc(f.aviso)}</span>` : '<span class="st-ok">Listo</span>');
+      return `<tr><td>${f.n}</td><td><b>${esc(f.desc||'—')}</b>${f.tipo?` <small>(${f.tipo})</small>`:''}</td><td>${f.fecha?fechaAR(f.fecha):'—'}</td><td>${dest}${f.term&&!f.cliTxt?` <small>(termina en ${esc(f.term)})</small>`:''}</td><td>${st}</td></tr>`; }).join('')}</tbody></table>`;
+    const errores=filas.filter(f=>f.err).length;
+    $('im-sum').textContent = `${IMP_ITEMS.length} vencimiento${IMP_ITEMS.length===1?'':'s'} para crear` + (errores?` · ${errores} fila${errores>1?'s':''} con error (se omiten)`:'');
+    $('im-ok').disabled = !IMP_ITEMS.length;
+    $('im-ok').textContent = IMP_ITEMS.length ? `Importar ${IMP_ITEMS.length}` : 'Importar';
+  }
+  async function impGuardar(){
+    if(!IMP_ITEMS.length) return;
+    const estado=$('im-e').value;
+    const items=IMP_ITEMS.map(({_c,...it})=>({...it,estado}));
+    const btn=$('im-ok'); const txt=btn.textContent; btn.disabled=true;
+    const r=await crearVencimientos(items,btn,txt);
+    btn.disabled=false; await terminarCarga(r,'m-imp');
+  }
+  function descargarPlantilla(){
+    const csv='﻿Descripción;Tipo;Terminación;Fecha;Cliente\r\nIVA mensual;Impositivo;0-1;18/11/2026;\r\nIVA mensual;Impositivo;2-3;19/11/2026;\r\nIVA mensual;Impositivo;4-5;20/11/2026;\r\nF931 cargas sociales;Laboral;;09/11/2026;Nombre de un cliente\r\nBalance anual;Societario;;30/11/2026;\r\n';
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='plantilla-vencimientos.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  }
+  async function leerArchivoImp(file){
+    const buf=await file.arrayBuffer();
+    let t=new TextDecoder('utf-8').decode(buf);
+    if(t.includes('�')) t=new TextDecoder('windows-1252').decode(buf);   // CSV guardado por Excel en Windows
+    $('im-txt').value=t.replace(/^﻿/,''); $('im-file-info').textContent=file.name; renderImpPrev();
+  }
+
   // ── DOCS ──
 function docModal(){ fillCli($('di-c')); $('di-n').value=''; $('di-t').value='Balance'; $('di-f').value=''; $('di-f-info').textContent='Ningún archivo seleccionado'; openM('m-doc'); }
   $('di-f-btn').addEventListener('click', () => $('di-f').click());
@@ -1619,6 +1908,23 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   $('cliSave').addEventListener('click',cliSave);
   $('addVen').addEventListener('click',()=>venModal());
   $('delSelVen').addEventListener('click',venDelMulti);
+  $('addLote').addEventListener('click',loteModal);
+  $('lo-ok').addEventListener('click',loteGuardar);
+  ['lo-d','lo-e'].forEach(i=>$(i).addEventListener('input',renderLotePrev));
+  $('lo-t').addEventListener('change',()=>{ $('lo-tsw').style.background=TIPO_COL[$('lo-t').value]||'#6b7280'; renderLotePrev(); });
+  $('lo-fecha').addEventListener('change',renderLotePrev);
+  $('lo-q').addEventListener('input',renderLoteList);
+  $('lo-todos').addEventListener('click',()=>{ const q=norm($('lo-q').value.trim()); clientesOrdenados().filter(c=>!q||norm(c.nombre).includes(q)||String(c.cuit||'').includes(q)).forEach(c=>LOTE.sel.add(c.id)); renderLoteList(); renderLoteTerm(); renderLotePrev(); });
+  $('lo-ninguno').addEventListener('click',()=>{ LOTE.sel.clear(); renderLoteList(); renderLoteTerm(); renderLotePrev(); });
+  $('lo-m1').addEventListener('click',()=>setLoteModo(1));
+  $('lo-m2').addEventListener('click',()=>setLoteModo(2));
+  $('lo-pares').addEventListener('change',e=>{ LOTE.pares=e.target.checked; if(LOTE.pares){ for(let d=0;d<10;d+=2) LOTE.dig[d+1]=LOTE.dig[d]; } renderLoteDigs(); renderLotePrev(); });
+  $('addImp').addEventListener('click',()=>{ $('im-txt').value=''; $('im-file').value=''; $('im-file-info').textContent=''; $('im-e').value='Pendiente'; renderImpPrev(); openM('m-imp'); });
+  $('im-txt').addEventListener('input',renderImpPrev);
+  $('im-pick').addEventListener('click',()=>$('im-file').click());
+  $('im-file').addEventListener('change',()=>{ const f=$('im-file').files[0]; if(f) leerArchivoImp(f); });
+  $('im-plantilla').addEventListener('click',descargarPlantilla);
+  $('im-ok').addEventListener('click',impGuardar);
   $('ven-all').addEventListener('change',e=>{ filasVisiblesVen().forEach(tr=>{ const cb=tr.querySelector('[data-sel-ven]'); cb.checked=e.target.checked; if(e.target.checked) SEL_VEN.add(cb.dataset.selVen); else SEL_VEN.delete(cb.dataset.selVen); }); actualizarSelVen(); });
   $('venDelBtn').addEventListener('click',async()=>{ const id=$('vi-id').value; if(!id) return; closeM('m-ven'); const ok=await venDel(id); if(!ok) openM('m-ven'); });
   $('venSave').addEventListener('click',venSave);

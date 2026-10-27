@@ -99,13 +99,25 @@ function normalizarRol(r) { return ROLES_VALIDOS.includes(r) ? r : 'contador'; }
 
 app.post('/api/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = String(req.body.email || '').trim();
     if (!email || !password) return res.status(400).json({ error: 'Falta email o contraseña' });
-    const [rows] = await db.query('SELECT * FROM usuarios WHERE email = ?', [email]);
-    if (rows.length === 0) return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+    const [rows] = await db.query('SELECT * FROM usuarios WHERE LOWER(TRIM(email)) = LOWER(?)', [email]);
+    if (rows.length === 0) {
+      console.warn('Login fallido: el email no está registrado ->', email);
+      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+    }
     const usuario = rows[0];
-    const ok = verifyPassword(password, usuario.password_hash);
-    if (!ok) return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+    let ok = false;
+    try {
+      ok = verifyPassword(password, usuario.password_hash);
+      // tolera espacios sobrantes al copiar/pegar la contraseña
+      if (!ok && password !== password.trim()) ok = verifyPassword(password.trim(), usuario.password_hash);
+    } catch (e) { console.error('Login: hash de contraseña inválido para el usuario', usuario.id, e.message); }
+    if (!ok) {
+      console.warn('Login fallido: contraseña incorrecta -> usuario', usuario.id, usuario.email);
+      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+    }
     const token = signToken(usuario);
     res.json({ token, usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol, cliente_id: usuario.cliente_id || null } });
   } catch (e) { res.status(500).json({ error: 'Error de servidor' }); }

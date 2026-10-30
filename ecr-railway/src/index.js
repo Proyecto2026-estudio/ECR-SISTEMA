@@ -7,6 +7,7 @@ const express = require('express');
 const cors    = require('cors');
 const db      = require('./db');
 const { consultarIA } = require('./ia');
+const { leerExtracto } = require('./extractos');
 const { registrarWhatsApp } = require('./whatsapp');
 
 const app  = express();
@@ -357,6 +358,22 @@ app.post('/api/asistente', requireAuth, async (req, res) => {
     res.json(await consultarIA(db, { prompt, system, useSearch, clienteId }));
   } catch (e) {
     console.error('POST /api/asistente:', e.message);
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+//  RF08 · LECTURA DE EXTRACTOS BANCARIOS CON IA (solo propone, no guarda)
+// ══════════════════════════════════════════════════════════
+app.post('/api/extractos/leer', requireAuth, async (req, res) => {
+  try {
+    const [us] = await db.query('SELECT rol FROM usuarios WHERE id = ?', [req.usuario.id]);
+    if (!us.length) return res.status(401).json({ error: 'No autorizado, iniciá sesión de nuevo' });
+    if (['cliente_pyme', 'lectura'].includes(us[0].rol)) return res.status(403).json({ error: 'Tu rol no puede usar la lectura de extractos' });
+    const { archivo_base64, mime } = req.body || {};
+    res.json(await leerExtracto({ base64: archivo_base64, mime }));
+  } catch (e) {
+    console.error('POST /api/extractos/leer:', e.message);
     res.status(e.status || 500).json({ error: e.message });
   }
 });

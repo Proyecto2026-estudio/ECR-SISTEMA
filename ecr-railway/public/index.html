@@ -535,6 +535,7 @@
       <div class="menu-i" data-v="agenda"><span class="mi">▦</span> Agenda <span class="ct" id="ct-ven">0</span></div>
       <div class="menu-i" data-v="docs"><span class="mi">▭</span> Documentos</div>
       <div class="menu-cap">Herramientas</div>
+      <div class="menu-i" data-v="extractos"><span class="mi">⇩</span> Extractos</div>
       <div class="menu-i" data-v="asistente"><span class="mi">✦</span> Asistente</div>
       <div class="menu-i" data-v="reportes"><span class="mi">▥</span> Reportes</div>
       <div class="menu-cap" id="cap-sistema">Sistema</div>
@@ -639,6 +640,29 @@
         <div class="tbar"><h2>Archivo digital</h2><div class="r"><div class="lupa"><span class="lp">🔍</span><input id="doc-q" type="search" placeholder="Buscar cliente o documento…" autocomplete="off"></div><button class="btn btn-soft" id="addDocMasa" title="Subir muchos archivos de un cliente de una sola vez">⇪ Carga masiva</button><button class="btn btn-pri" id="addDoc">+ Documento</button></div></div>
         <div class="docs-back" id="docs-back" style="display:none"><button class="btn btn-soft" id="doc-back">← Todos los clientes</button><h3 id="doc-cli-t"></h3><div id="doc-selbar"><label><input type="checkbox" id="doc-all"> Seleccionar todos</label><button class="btn btn-danger" id="doc-delsel" style="display:none"><span>🗑 Eliminar seleccionados (<span id="doc-delsel-n">0</span>)</span></button></div></div>
         <div class="docs" id="g-docs"></div>
+      </section>
+
+      <!-- EXTRACTOS (RF08) -->
+      <section class="view" id="v-extractos">
+        <div class="panel"><div class="ph"><h3>⇩ Leer un extracto bancario</h3><span class="chip gold"><span class="dt"></span>la IA propone · vos confirmás</span></div><div class="pb">
+          <p style="font-size:0.86rem;color:var(--ink-2);line-height:1.6;margin-bottom:0.8rem">Subí el extracto en PDF (hasta 15 páginas). La IA lee los movimientos y sugiere a qué cuenta corresponde cada uno. El sistema controla que la suma coincida con los saldos del extracto. <b>Nada se guarda</b>: revisás, corregís lo que haga falta y descargás el resultado.</p>
+          <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:center">
+            <input type="file" id="ex-file" accept="application/pdf,image/*">
+            <button class="btn btn-pri" id="ex-go" disabled><span>Leer extracto</span></button>
+            <span id="ex-st" style="font-size:0.84rem;color:var(--ink-2)"></span>
+          </div>
+        </div></div>
+        <div id="ex-res" style="display:none">
+          <div class="panel" style="margin-top:1rem"><div class="ph"><h3>Resumen</h3><div><button class="btn btn-soft btn-sm" id="ex-csv">⇩ Descargar CSV</button></div></div><div class="pb">
+            <div id="ex-sum" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0.6rem;margin-bottom:0.7rem"></div>
+            <div id="ex-avisos" style="font-size:0.84rem;line-height:1.55"></div>
+            <div id="ex-uso" style="font-size:0.78rem;color:var(--ink-2);margin-top:0.5rem"></div>
+          </div></div>
+          <div class="panel" style="margin-top:1rem"><table>
+            <thead><tr><th>Fecha</th><th>Descripción</th><th style="text-align:right">Débito</th><th style="text-align:right">Crédito</th><th>Cuenta propuesta</th></tr></thead>
+            <tbody id="ex-tb"></tbody>
+          </table></div>
+        </div>
       </section>
 
       <!-- ASISTENTE -->
@@ -926,8 +950,8 @@
     admin: [],
     contador: ['usuarios','ajustes'],
     usuario: ['usuarios','ajustes'],
-    lectura: ['usuarios','ajustes'],
-    cliente_pyme: ['usuarios','ajustes','inicio','clientes','reportes']
+    lectura: ['usuarios','ajustes','extractos'],
+    cliente_pyme: ['usuarios','ajustes','inicio','clientes','reportes','extractos']
   };
   function aplicarAlcanceRol(){
     // Un Cliente PyME solo puede ver sus propios datos, nunca los de otro cliente del estudio.
@@ -989,8 +1013,59 @@
 
   let calRef = new Date();
 
+
+  // ── EXTRACTOS BANCARIOS (RF08) ──
+  let EX = null;
+  const fmtARS = n => (n<0?'-':'')+Math.abs(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const escH = t => String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  if($('ex-file')){
+    $('ex-file').addEventListener('change',()=>{ $('ex-go').disabled = !$('ex-file').files.length; $('ex-st').textContent=''; });
+    $('ex-go').addEventListener('click', async ()=>{
+      const f = $('ex-file').files[0]; if(!f) return;
+      if(f.size > 11*1024*1024){ $('ex-st').textContent='El archivo es muy grande (máximo 11 MB).'; return; }
+      $('ex-go').disabled = true; $('ex-st').textContent='Leyendo el extracto… puede tardar hasta un minuto.';
+      try{
+        const b64 = await new Promise((ok,ko)=>{ const r=new FileReader(); r.onload=()=>ok(String(r.result).split(',')[1]); r.onerror=ko; r.readAsDataURL(f); });
+        EX = await api('/api/extractos/leer','POST',{ archivo_base64:b64, mime:f.type||'application/pdf' });
+        $('ex-st').textContent=''; renderExtracto();
+      }catch(e){ $('ex-st').textContent = '⚠ '+e.message; }
+      $('ex-go').disabled = false;
+    });
+    $('ex-csv').addEventListener('click',()=>{
+      if(!EX) return;
+      const q = v => '"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+      const nom = c => (EX.cuentas.find(x=>x.codigo===c)||{}).nombre || c;
+      const filas = [['Fecha','Descripción','Débito','Crédito','Cuenta'].map(q).join(';')];
+      EX.movimientos.forEach(m=>filas.push([fmtFecha(m.fecha),m.descripcion,m.importe<0?(-m.importe).toFixed(2).replace('.',','):'',m.importe>0?m.importe.toFixed(2).replace('.',','):'',nom(m.cuenta)].map(q).join(';')));
+      const blob = new Blob(['\ufeff'+filas.join('\r\n')],{type:'text/csv;charset=utf-8'});
+      const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='extracto-propuesta.csv'; a.click(); URL.revokeObjectURL(a.href);
+    });
+  }
+  const fmtFecha = f => /^\d{4}-\d{2}-\d{2}$/.test(f||'') ? f.split('-').reverse().join('/') : escH(f);
+  function renderExtracto(){
+    const d = EX, v = d.verificacion;
+    const deb = d.movimientos.filter(m=>m.importe<0).reduce((a,m)=>a+m.importe,0);
+    const cre = d.movimientos.filter(m=>m.importe>0).reduce((a,m)=>a+m.importe,0);
+    const tarj = (t,x,c)=>`<div style="border:1px solid var(--line,#ddd);border-radius:8px;padding:0.55rem 0.75rem"><div style="font-size:0.74rem;color:var(--ink-2)">${t}</div><div style="font-weight:600;${c?'color:'+c:''}">${x}</div></div>`;
+    $('ex-sum').innerHTML =
+      tarj('Movimientos', d.movimientos.length) + tarj('Débitos', '$ '+fmtARS(-deb)) + tarj('Créditos', '$ '+fmtARS(cre)) +
+      tarj('Saldo inicial', d.saldo_inicial==null?'—':'$ '+fmtARS(d.saldo_inicial)) + tarj('Saldo final', d.saldo_final==null?'—':'$ '+fmtARS(d.saldo_final)) +
+      tarj('Control de saldos', v.saldoOk===true?'✔ Cierra':(v.saldoOk===false?'✖ No cierra':'Sin verificar'), v.saldoOk===true?'var(--green)':(v.saldoOk===false?'#b3261e':'')); 
+    $('ex-avisos').innerHTML = v.avisos.length ? v.avisos.map(a=>'⚠ '+escH(a)).join('<br>') : '<span style="color:var(--green)">✔ Todo coincide con el extracto.</span>';
+    const u = d.uso;
+    $('ex-uso').textContent = `${d.banco?d.banco+' · ':''}Modelo ${u.modelo} · ${u.tokens_entrada.toLocaleString('es-AR')} tokens de entrada, ${u.tokens_salida.toLocaleString('es-AR')} de salida · costo de esta lectura: USD ${u.costo_usd.toFixed(4)}`;
+    const prob = new Set(v.filasConProblema);
+    $('ex-tb').innerHTML = d.movimientos.map((m,i)=>{
+      const opts = d.cuentas.map(c=>`<option value="${c.codigo}"${c.codigo===m.cuenta?' selected':''}>${escH(c.nombre)}</option>`).join('');
+      const bg = prob.has(i) ? 'background:#fdecea' : (m.cuenta==='REVISAR'?'background:#fff6df':'');
+      return `<tr style="${bg}"><td style="white-space:nowrap">${fmtFecha(m.fecha)}</td><td>${escH(m.descripcion)}</td><td style="text-align:right">${m.importe<0?fmtARS(-m.importe):''}</td><td style="text-align:right">${m.importe>0?fmtARS(m.importe):''}</td><td><select data-ex="${i}" style="max-width:260px">${opts}</select></td></tr>`;
+    }).join('');
+    $('ex-tb').querySelectorAll('select').forEach(s=>s.addEventListener('change',()=>{ EX.movimientos[+s.dataset.ex].cuenta = s.value; }));
+    $('ex-res').style.display='';
+  }
+
   // ── NAVEGACIÓN ──
-  const titles = { inicio:['Panel general','Resumen del estudio'], clientes:['Clientes','Cartera del estudio'], agenda:['Agenda de vencimientos','Calendario impositivo y laboral'], docs:['Archivo digital','Documentos del estudio'], asistente:['Asistente','Consultas del estudio'], reportes:['Reportes','Métricas y análisis'], ajustes:['Configuración','Ajustes del sistema'], usuarios:['Usuarios del sistema','Accesos y roles'] };
+  const titles = { inicio:['Panel general','Resumen del estudio'], clientes:['Clientes','Cartera del estudio'], agenda:['Agenda de vencimientos','Calendario impositivo y laboral'], docs:['Archivo digital','Documentos del estudio'], asistente:['Asistente','Consultas del estudio'], extractos:['Extractos bancarios','Lectura con IA · el contador revisa y confirma'], reportes:['Reportes','Métricas y análisis'], ajustes:['Configuración','Ajustes del sistema'], usuarios:['Usuarios del sistema','Accesos y roles'] };
   function nav(v){
     if(!ES_ADMIN && (v==='usuarios'||v==='ajustes')) v = 'agenda';
     document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));

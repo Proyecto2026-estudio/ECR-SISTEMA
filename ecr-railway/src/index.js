@@ -299,13 +299,27 @@ app.delete('/api/vencimientos/:id', async (req, res) => {
 // ══════════════════════════════════════════════════════════
 //  DOCUMENTOS
 // ══════════════════════════════════════════════════════════
-app.get('/api/documentos', async (req, res) => {
+// Datos del usuario con sesión (rol y, si es Cliente PyME, su cliente).
+async function usuarioActual(req) {
+  const [us] = await db.query('SELECT rol, cliente_id FROM usuarios WHERE id = ?', [req.usuario.id]);
+  return us[0] || null;
+}
+const sinSesion = res => res.status(401).json({ error: 'No autorizado, iniciá sesión de nuevo' });
+
+app.get('/api/documentos', requireAuth, async (req, res) => {
   try {
+    const u = await usuarioActual(req);
+    if (!u) return sinSesion(res);
+    // Un Cliente PyME solo recibe los documentos de su propia empresa.
+    if (u.rol === 'cliente_pyme' && !u.cliente_id) return res.json([]);
+    const soloMio = u.rol === 'cliente_pyme';
     const [rows] = await db.query(
       `SELECT d.id, d.nombre, d.tipo, d.cliente_id, d.fecha, d.archivo_mime, d.archivo_nombre_original, c.nombre AS cliente_nombre
        FROM documentos d
        LEFT JOIN clientes c ON d.cliente_id = c.id
-       ORDER BY d.id DESC`
+       ${soloMio ? 'WHERE d.cliente_id = ?' : ''}
+       ORDER BY d.id DESC`,
+      soloMio ? [u.cliente_id] : []
     );
     res.json(rows);
   } catch (e) { res.status(500).json({ error: 'Error de base de datos' }); }
@@ -333,20 +347,28 @@ app.post('/api/documentos', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Error al guardar' }); }
 });
 
-app.get('/api/documentos/:id/archivo', async (req, res) => {
+app.get('/api/documentos/:id/archivo', requireAuth, async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT archivo_data, archivo_mime, archivo_nombre_original FROM documentos WHERE id = ?', [req.params.id]);
+    const u = await usuarioActual(req);
+    if (!u) return sinSesion(res);
+    const [rows] = await db.query('SELECT cliente_id, archivo_data, archivo_mime, archivo_nombre_original FROM documentos WHERE id = ?', [req.params.id]);
     if (rows.length === 0 || !rows[0].archivo_data) return res.status(404).json({ error: 'No hay archivo cargado para este documento' });
     const doc = rows[0];
+    // Un Cliente PyME solo puede abrir documentos de su propia empresa.
+    if (u.rol === 'cliente_pyme' && (!u.cliente_id || String(doc.cliente_id) !== String(u.cliente_id)))
+      return res.status(403).json({ error: 'No tenés acceso a este documento' });
     const buffer = Buffer.from(doc.archivo_data, 'base64');
     res.setHeader('Content-Type', doc.archivo_mime || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `inline; filename="${doc.archivo_nombre_original || 'archivo'}"`);
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(doc.archivo_nombre_original || 'archivo')}`);
     res.send(buffer);
   } catch (e) { res.status(500).json({ error: 'Error al leer el archivo' }); }
 });
 
-app.delete('/api/documentos/:id', async (req, res) => {
+app.delete('/api/documentos/:id', requireAuth, async (req, res) => {
   try {
+    const u = await usuarioActual(req);
+    if (!u) return sinSesion(res);
+    if (['cliente_pyme', 'lectura'].includes(u.rol)) return res.status(403).json({ error: 'Tu rol no puede eliminar documentos' });
     await db.query('DELETE FROM documentos WHERE id=?', [req.params.id]);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: 'Error al eliminar' }); }

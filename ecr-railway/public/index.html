@@ -1720,6 +1720,21 @@
     }
   }
 
+  // Abrir un archivo: se pide al servidor con la sesión iniciada (ya no hay links abiertos).
+  document.addEventListener('click', async e=>{
+    const b = e.target.closest('[data-ver-doc]'); if(!b) return;
+    e.stopPropagation();
+    const w = window.open('', '_blank');   // se abre antes de pedir el archivo para que el navegador no lo bloquee
+    try{
+      const tok = localStorage.getItem('ecr_token')||'';
+      const r = await fetch(`${API_BASE}/api/documentos/${b.dataset.verDoc}/archivo`, { headers:{ 'Authorization':'Bearer '+tok } });
+      if(!r.ok){ let m='No se pudo abrir el archivo'; try{ m=(await r.json()).error||m; }catch(_){} throw new Error(m); }
+      const url = URL.createObjectURL(await r.blob());
+      if(w) w.location.href = url; else window.location.href = url;
+      setTimeout(()=>URL.revokeObjectURL(url), 120000);
+    }catch(err){ if(w) w.close(); toast(err.message); }
+  }, true);
+
   // ── DOCS ──
 function docModal(){ fillCli($('di-c')); $('di-n').value=''; $('di-t').value='Balance'; $('di-f').value=''; $('di-f-info').textContent='Ningún archivo seleccionado'; openM('m-doc'); }
   $('di-f-btn').addEventListener('click', () => $('di-f').click());
@@ -1815,7 +1830,7 @@ async function docSave(){
     DOC_VISIBLES = lista.map(d=>d.id);
     if(!lista.length){ g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="e">▭</div>Ningún documento coincide con la búsqueda.</div>`; actualizarSelDoc(); return; }
     g.innerHTML = lista.map(d=>{
-      const ver = d.archivo_mime ? `<a href="${API_BASE}/api/documentos/${d.id}/archivo" target="_blank" rel="noopener" class="btn btn-soft btn-sm">Ver archivo</a>` : `<span class="dm" style="font-style:italic">Sin archivo adjunto</span>`;
+      const ver = d.archivo_mime ? `<button type="button" class="btn btn-soft btn-sm" data-ver-doc="${d.id}">Ver archivo</button>` : `<span class="dm" style="font-style:italic">Sin archivo adjunto</span>`;
       const del = PUEDE_EDITAR ? `<button class="btn btn-soft btn-sm" style="color:var(--red);border-color:var(--red)" data-del-doc="${d.id}">Eliminar</button>` : '';
       return `<div class="doc" data-doc="${d.id}">${PUEDE_EDITAR?`<label class="doc-sel" title="Seleccionar"><input type="checkbox" data-sel-doc="${d.id}" ${SEL_DOC.has(d.id)?'checked':''}></label>`:''}<div class="di">${ic[d.tipo]||'📁'}</div><div class="dt">${esc(d.nombre)}</div><div class="dm">${esc(d.tipo)}</div><div class="dm">${new Date(d.fecha+'T00:00').toLocaleDateString('es-AR')}</div><div class="doc-acts">${ver}${del}</div></div>`;
     }).join('');

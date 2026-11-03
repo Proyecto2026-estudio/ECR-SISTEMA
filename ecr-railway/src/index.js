@@ -311,10 +311,20 @@ app.get('/api/documentos', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Error de base de datos' }); }
 });
 
-app.post('/api/documentos', async (req, res) => {
-  const { nombre, tipo, cliente_id, fecha, archivo_data, archivo_mime, archivo_nombre_original } = req.body;
+app.post('/api/documentos', requireAuth, async (req, res) => {
+  const { nombre, tipo, fecha, archivo_data, archivo_mime, archivo_nombre_original } = req.body;
+  let { cliente_id } = req.body;
   if (!nombre) return res.status(400).json({ error: 'El nombre es obligatorio' });
   try {
+    // Un Cliente PyME puede cargar documentos, pero SOLO en su propia carpeta;
+    // el rol "lectura" no puede cargar nada.
+    const [us] = await db.query('SELECT rol, cliente_id FROM usuarios WHERE id = ?', [req.usuario.id]);
+    if (!us.length) return res.status(401).json({ error: 'No autorizado, iniciá sesión de nuevo' });
+    if (us[0].rol === 'lectura') return res.status(403).json({ error: 'Tu rol no puede cargar documentos' });
+    if (us[0].rol === 'cliente_pyme') {
+      if (!us[0].cliente_id) return res.status(403).json({ error: 'Tu usuario no tiene un cliente asociado' });
+      cliente_id = us[0].cliente_id;
+    }
     const [r] = await db.query(
       'INSERT INTO documentos (nombre,tipo,cliente_id,fecha,archivo_data,archivo_mime,archivo_nombre_original) VALUES (?,?,?,?,?,?,?)',
       [nombre, tipo||'Otro', cliente_id||null, fecha||new Date().toISOString().slice(0,10), archivo_data||null, archivo_mime||null, archivo_nombre_original||null]

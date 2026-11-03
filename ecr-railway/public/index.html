@@ -492,7 +492,7 @@
   .mf .sum { margin-right: auto; font-size: 0.88rem; font-weight: 600; color: var(--ink-2); align-self: center; }
 
   /* ─── Carga masiva de documentos ─── */
-  body.no-edit #addDocMasa { display: none !important; }
+  body.no-edit:not(.es-pyme) #addDocMasa { display: none !important; }   /* el Cliente PyME sí puede cargar sus documentos */
   .dropzone { border: 2.5px dashed #9d9580; border-radius: 12px; background: var(--panel-2); padding: 1.6rem 1rem; text-align: center; color: var(--ink-2); cursor: pointer; transition: all .15s; }
   .dropzone:hover, .dropzone.over { border-color: var(--gold); background: var(--gold-soft); }
   .dropzone .big { font-size: 2.2rem; }
@@ -963,6 +963,7 @@
   }
   function aplicarPermisosUI(){
     document.body.classList.toggle('no-edit', !PUEDE_EDITAR);
+    document.body.classList.toggle('es-pyme', ES_PYME);
     (NAV_OCULTO[ROL]||NAV_OCULTO.contador).forEach(v=>{
       const el=document.querySelector(`.menu-i[data-v="${v}"]`); if(el) el.style.display='none';
     });
@@ -1649,6 +1650,10 @@
   function docMasaModal(){
     fillCli($('dm-c'));
     $('dm-c').value = (DOC_CLI!==null && DOC_CLI!=='') ? DOC_CLI : '';
+    if(ES_PYME){   // el Cliente PyME solo carga en su propia carpeta
+      $('dm-c').innerHTML = DB.clientes.map(c=>`<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
+      $('dm-c').value = MI_CLIENTE_ID || ''; $('dm-c').disabled = true;
+    } else $('dm-c').disabled = false;
     DM.files=[]; DM.subiendo=false; $('dm-file').value='';
     $('dm-bar').style.display='none'; $('dm-bar-i').style.width='0';
     renderDM(); openM('m-dmasa');
@@ -1688,7 +1693,7 @@
     $('dm-ok').textContent = n ? `Subir ${n} documento${n===1?'':'s'}` : 'Subir documentos';
   }
   async function subirDM(){
-    const cli=$('dm-c').value||null, pend=DM.files.filter(x=>x.incluir && x.estado!=='ok');
+    const cli=(ES_PYME ? MI_CLIENTE_ID : $('dm-c').value)||null, pend=DM.files.filter(x=>x.incluir && x.estado!=='ok');
     if(!pend.length) return;
     if(pend.some(x=>!x.nombre.trim())){ toast('Hay documentos sin nombre'); return; }
     DM.subiendo=true; renderDM(); $('dm-ok').disabled=true; $('dm-cancel').disabled=true;

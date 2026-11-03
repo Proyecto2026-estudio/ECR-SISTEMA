@@ -495,6 +495,13 @@
 
   /* ─── Carga masiva de documentos ─── */
   body.no-edit:not(.es-pyme) #addDocMasa { display: none !important; }   /* el Cliente PyME sí puede cargar sus documentos */
+  /* Ejemplo fijo de la carga masiva de vencimientos: no se edita ni se borra */
+  .im-ej { margin-bottom: 0.9rem; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; padding: 0.6rem 0.8rem 0.7rem; user-select: none; -webkit-user-select: none; pointer-events: none; overflow-x: auto; }
+  .im-ej-t { font-size: 0.74rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 0.35rem; }
+  .im-ej table { width: 100%; border-collapse: collapse; font-size: 0.82rem; font-family: 'Inter', sans-serif; }
+  .im-ej th { text-align: left; font-weight: 600; color: var(--ink-2); padding: 0.25rem 0.6rem; border-bottom: 1.5px solid var(--line); white-space: nowrap; }
+  .im-ej td { padding: 0.28rem 0.6rem; border-bottom: 1px solid var(--line-soft); white-space: nowrap; color: var(--ink); }
+  .im-ej tr:last-child td { border-bottom: none; }
   #ex-drop { padding: 2rem 1rem; }
   .ex-chosen { display: flex; align-items: center; gap: 0.8rem; margin-top: 0.9rem; padding: 0.7rem 0.9rem; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
   .ex-chosen .ex-ic { font-size: 1.6rem; }
@@ -857,7 +864,18 @@
       • <b>Cliente</b> (opcional): nombre o CUIT. Si lo completás, el vencimiento es solo para ese cliente. Si dejás ambos vacíos, es un vencimiento general del estudio.<br>
       • <b>Fecha</b>: <code>18/11/2026</code> o <code>2026-11-18</code>. <b>Tipo</b>: Impositivo, Laboral, Previsional o Societario.
     </div>
-    <div class="fld"><textarea class="big" id="im-txt" placeholder="IVA mensual&#9;Impositivo&#9;0-1&#9;18/11/2026&#10;IVA mensual&#9;Impositivo&#9;2-3&#9;19/11/2026&#10;F931 cargas sociales&#9;Laboral&#9;&#9;09/11/2026&#9;Panadería La Espiga"></textarea></div>
+    <div class="im-ej" aria-label="Ejemplo de cómo cargar las filas">
+      <div class="im-ej-t">Ejemplo</div>
+      <table>
+        <thead><tr><th>Descripción</th><th>Tipo</th><th>Terminación</th><th>Fecha</th><th>Cliente</th></tr></thead>
+        <tbody>
+          <tr><td>IVA mensual</td><td>Impositivo</td><td>0-1</td><td>18/11/2026</td><td></td></tr>
+          <tr><td>IVA mensual</td><td>Impositivo</td><td>2-3</td><td>19/11/2026</td><td></td></tr>
+          <tr><td>F931 cargas sociales</td><td>Laboral</td><td></td><td>09/11/2026</td><td>Panadería La Espiga</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="fld"><textarea class="big" id="im-txt" placeholder="Pegá acá las filas copiadas desde Excel…"></textarea></div>
     <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
       <input type="file" id="im-file" accept=".csv,.txt,.tsv" style="display:none">
       <button type="button" class="btn btn-soft btn-sm" id="im-pick">📎 Elegir archivo CSV</button>

@@ -171,6 +171,7 @@
   .nm { font-weight: 600; color: var(--ink); }
   .mono { font-family: 'Inter'; font-variant-numeric: tabular-nums; font-size: 0.8rem; }
   .acts { display: flex; gap: 0.4rem; }
+  body.no-edit .dia-it > .ib:not(.dia-del) { display: none; }
   body.no-edit .acts, body.no-edit #addCli, body.no-edit #addVen, body.no-edit #addDoc, body.no-edit #addUsr, body.no-edit #newBtn { display: none !important; }
   body.no-edit .doc { cursor: default; }
   .ib { width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink-2); cursor: pointer; font-size: 0.8rem; display: inline-flex; align-items: center; justify-content: center; transition: all .14s; }
@@ -1307,10 +1308,16 @@
     if(id){ const v=DB.venc.find(x=>x.id===id); $('vi-id').value=v.id; $('vi-d').value=v.desc; $('vi-c').value=v.cli||''; $('vi-t').value=v.tipo; $('vi-f').value=v.fecha; $('vi-e').value=v.estado; }
     else { $('vi-id').value=''; $('vi-d').value=''; $('vi-c').value=''; $('vi-t').value='Impositivo'; $('vi-f').value=preset||new Date(Date.now()+5*864e5).toISOString().slice(0,10); $('vi-e').value='Pendiente'; }
     $('venDelBtn').style.display = (id && PUEDE_EDITAR) ? '' : 'none';
+    // Sin permiso de edición (Cliente PyME / solo lectura): se puede ver el detalle, pero no modificarlo.
+    const soloVer = !PUEDE_EDITAR;
+    ['vi-d','vi-c','vi-t','vi-f','vi-e'].forEach(k=>{ $(k).disabled = soloVer; });
+    $('venSave').style.display = soloVer ? 'none' : '';
+    if(soloVer) $('venTitle').textContent = 'Detalle del vencimiento';
     updVenSw(); openM('m-ven');
   }
   function updVenSw(){ $('vi-sw').style.background = cliColor($('vi-c').value); $('vi-tsw').style.background = TIPO_COL[$('vi-t').value] || '#6b7280'; }
   async function venSave(){
+    if(!PUEDE_EDITAR) return;
     const desc=$('vi-d').value.trim(), fecha=$('vi-f').value;
     if(!desc||!fecha){ toast('Completá descripción y fecha'); return; }
     const data={ descripcion:desc, cliente_id:$('vi-c').value||null, tipo:$('vi-t').value, fecha, estado:$('vi-e').value };

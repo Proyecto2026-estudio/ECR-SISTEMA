@@ -266,7 +266,7 @@ app.get('/api/vencimientos', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Error de base de datos' }); }
 });
 
-app.post('/api/vencimientos', async (req, res) => {
+app.post('/api/vencimientos', requireAuth, soloEscritura, async (req, res) => {
   const { descripcion, cliente_id, tipo, fecha, estado } = req.body;
   if (!descripcion || !fecha) return res.status(400).json({ error: 'Descripción y fecha son obligatorias' });
   try {
@@ -278,7 +278,7 @@ app.post('/api/vencimientos', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Error al guardar' }); }
 });
 
-app.put('/api/vencimientos/:id', async (req, res) => {
+app.put('/api/vencimientos/:id', requireAuth, soloEscritura, async (req, res) => {
   const { descripcion, cliente_id, tipo, fecha, estado } = req.body;
   try {
     await db.query(
@@ -289,7 +289,7 @@ app.put('/api/vencimientos/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Error al actualizar' }); }
 });
 
-app.delete('/api/vencimientos/:id', async (req, res) => {
+app.delete('/api/vencimientos/:id', requireAuth, soloEscritura, async (req, res) => {
   try {
     await db.query('DELETE FROM vencimientos WHERE id=?', [req.params.id]);
     res.json({ ok: true });
@@ -303,6 +303,15 @@ app.delete('/api/vencimientos/:id', async (req, res) => {
 async function usuarioActual(req) {
   const [us] = await db.query('SELECT rol, cliente_id FROM usuarios WHERE id = ?', [req.usuario.id]);
   return us[0] || null;
+}
+// Cargar, editar o borrar vencimientos: no puede el Cliente PyME ni el rol de solo lectura.
+async function soloEscritura(req, res, next) {
+  try {
+    const u = await usuarioActual(req);
+    if (!u) return sinSesion(res);
+    if (['cliente_pyme', 'lectura'].includes(u.rol)) return res.status(403).json({ error: 'Tu rol no puede modificar vencimientos' });
+    next();
+  } catch (e) { res.status(500).json({ error: 'Error de base de datos' }); }
 }
 const sinSesion = res => res.status(401).json({ error: 'No autorizado, iniciá sesión de nuevo' });
 

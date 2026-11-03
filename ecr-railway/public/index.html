@@ -495,6 +495,14 @@
 
   /* ─── Carga masiva de documentos ─── */
   body.no-edit:not(.es-pyme) #addDocMasa { display: none !important; }   /* el Cliente PyME sí puede cargar sus documentos */
+  #ex-drop { padding: 2rem 1rem; }
+  .ex-chosen { display: flex; align-items: center; gap: 0.8rem; margin-top: 0.9rem; padding: 0.7rem 0.9rem; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
+  .ex-chosen .ex-ic { font-size: 1.6rem; }
+  .ex-chosen .ex-nm { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .ex-chosen .ex-nm b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.92rem; }
+  .ex-chosen .ex-nm span { font-size: 0.78rem; color: var(--ink-2); }
+  .ex-actions { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; margin-top: 1rem; }
+  .ex-actions .btn-pri { padding: 0.75rem 1.6rem; font-size: 1rem; }
   .dropzone { border: 2.5px dashed #9d9580; border-radius: 12px; background: var(--panel-2); padding: 1.6rem 1rem; text-align: center; color: var(--ink-2); cursor: pointer; transition: all .15s; }
   .dropzone:hover, .dropzone.over { border-color: var(--gold); background: var(--gold-soft); }
   .dropzone .big { font-size: 2.2rem; }
@@ -648,10 +656,20 @@
       <section class="view" id="v-extractos">
         <div class="panel"><div class="ph"><h3>⇩ Leer un extracto bancario</h3><span class="chip gold"><span class="dt"></span>la IA propone · vos confirmás</span></div><div class="pb">
           <p style="font-size:0.86rem;color:var(--ink-2);line-height:1.6;margin-bottom:0.8rem">Subí el extracto en PDF (hasta 15 páginas). La IA lee los movimientos y sugiere a qué cuenta corresponde cada uno. El sistema controla que la suma coincida con los saldos del extracto. <b>Nada se guarda</b>: revisás, corregís lo que haga falta y descargás el resultado.</p>
-          <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:center">
-            <input type="file" id="ex-file" accept="application/pdf,image/*">
+          <div class="dropzone" id="ex-drop" tabindex="0" role="button" aria-label="Elegir el extracto">
+            <div class="big">🏦</div>
+            <div><b>Arrastrá acá el extracto</b> o tocá para elegirlo</div>
+            <div style="font-size:0.82rem;margin-top:0.3rem">PDF o imagen · hasta 15 páginas · máximo 11 MB</div>
+            <input type="file" id="ex-file" accept="application/pdf,image/*" style="display:none">
+          </div>
+          <div class="ex-chosen" id="ex-chosen" style="display:none">
+            <span class="ex-ic">📄</span>
+            <div class="ex-nm"><b id="ex-nm"></b><span id="ex-sz"></span></div>
+            <button class="ib" id="ex-x" type="button" title="Quitar">✕</button>
+          </div>
+          <div class="ex-actions">
             <button class="btn btn-pri" id="ex-go" disabled><span>Leer extracto</span></button>
-            <span id="ex-st" style="font-size:0.84rem;color:var(--ink-2)"></span>
+            <span id="ex-st" style="font-size:0.86rem;color:var(--ink-2)"></span>
           </div>
         </div></div>
         <div id="ex-res" style="display:none">
@@ -1022,7 +1040,19 @@
   const fmtARS = n => (n<0?'-':'')+Math.abs(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
   const escH = t => String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   if($('ex-file')){
-    $('ex-file').addEventListener('change',()=>{ $('ex-go').disabled = !$('ex-file').files.length; $('ex-st').textContent=''; });
+    const exElegido = ()=>{
+      const f = $('ex-file').files[0];
+      $('ex-go').disabled = !f; $('ex-st').textContent='';
+      $('ex-chosen').style.display = f ? 'flex' : 'none'; $('ex-drop').style.display = f ? 'none' : '';
+      if(f){ $('ex-nm').textContent = f.name; $('ex-sz').textContent = f.size>=1048576 ? (f.size/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(f.size/1024))+' KB'; }
+    };
+    $('ex-file').addEventListener('change',exElegido);
+    $('ex-drop').addEventListener('click',()=>$('ex-file').click());
+    $('ex-drop').addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); $('ex-file').click(); } });
+    ['dragenter','dragover'].forEach(t=>$('ex-drop').addEventListener(t,e=>{ e.preventDefault(); $('ex-drop').classList.add('over'); }));
+    ['dragleave','drop'].forEach(t=>$('ex-drop').addEventListener(t,e=>{ e.preventDefault(); $('ex-drop').classList.remove('over'); }));
+    $('ex-drop').addEventListener('drop',e=>{ if(e.dataTransfer.files.length){ $('ex-file').files = e.dataTransfer.files; exElegido(); } });
+    $('ex-x').addEventListener('click',()=>{ $('ex-file').value=''; exElegido(); });
     $('ex-go').addEventListener('click', async ()=>{
       const f = $('ex-file').files[0]; if(!f) return;
       if(f.size > 11*1024*1024){ $('ex-st').textContent='El archivo es muy grande (máximo 11 MB).'; return; }

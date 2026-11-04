@@ -496,6 +496,16 @@
   /* ─── Carga masiva de documentos ─── */
   body.no-edit:not(.es-pyme) #addDocMasa { display: none !important; }   /* el Cliente PyME sí puede cargar sus documentos */
   /* Ejemplo fijo de la carga masiva de vencimientos: no se edita ni se borra */
+  .im-gw { border: 1.5px solid var(--line); border-radius: 10px; background: #fff; max-height: 280px; overflow: auto; margin-bottom: 0.6rem; }
+  .im-grid { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  .im-grid th { position: sticky; top: 0; background: var(--bg-2, #f4f1ea); text-align: left; font-weight: 700; font-size: 0.72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 0.4rem 0.5rem; border-bottom: 1.5px solid var(--line); border-right: 1px solid var(--line-soft); white-space: nowrap; z-index: 1; }
+  .im-grid td { padding: 0; border-bottom: 1px solid var(--line-soft); border-right: 1px solid var(--line-soft); }
+  .im-grid td.rn { width: 2rem; text-align: center; color: var(--ink-3); font-size: 0.74rem; background: #faf8f3; }
+  .im-grid td.rx { width: 2rem; text-align: center; }
+  .im-grid input { width: 100%; border: none; outline: none; background: transparent; font: inherit; padding: 0.42rem 0.5rem; min-width: 5.5rem; }
+  .im-grid td:nth-child(2) input { min-width: 12rem; }
+  .im-grid input:focus { background: #fffbe9; box-shadow: inset 0 0 0 2px var(--accent, #b8860b); }
+  .im-grid .rx button { border: none; background: none; cursor: pointer; color: var(--ink-3); font-size: 1rem; }
   .im-ej { margin-bottom: 0.9rem; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; padding: 0.6rem 0.8rem 0.7rem; user-select: none; -webkit-user-select: none; pointer-events: none; overflow-x: auto; }
   .im-ej-t { font-size: 0.74rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 0.35rem; }
   .im-ej table { width: 100%; border-collapse: collapse; font-size: 0.82rem; font-family: 'Inter', sans-serif; }
@@ -622,7 +632,8 @@
             <th><span class="th-in">CUIT <button class="fbtn" data-fcol="cuit" title="Filtrar por terminación del CUIT">▾</button></span></th>
             <th><span class="th-in">Servicio <button class="fbtn" data-fcol="servicio" title="Filtrar y ordenar">▾</button></span></th>
             <th><span class="th-in">Honorarios <button class="fbtn" data-fcol="honorarios" title="Filtrar y ordenar">▾</button></span></th>
-            <th><span class="th-in">Estado <button class="fbtn" data-fcol="estado" title="Filtrar y ordenar">▾</button></span></th><th></th></tr></thead>
+            <th><span class="th-in">Estado <button class="fbtn" data-fcol="estado" title="Filtrar y ordenar">▾</button></span></th>
+            <th>Mail de alertas</th><th></th></tr></thead>
           <tbody id="t-cli"></tbody>
         </table></div>
       </section>
@@ -802,7 +813,7 @@
       <div class="fld"><label>CUIT</label><input id="ci-c" placeholder="30-12345678-9" maxlength="13" inputmode="numeric"></div>
       <div class="fld"><label>Honorarios ($/mes)</label><input id="ci-h" type="number" placeholder="45000"></div>
     </div>
-    <div class="fld"><label>WhatsApp del cliente (para el asistente)</label><input id="ci-w" placeholder="+54 9 11 5555-1234" inputmode="tel"></div>
+    <div class="fld"><label>Mail para las alertas de vencimientos</label><input id="ci-m" type="text" placeholder="cliente@empresa.com (podés poner varios separados por coma)" inputmode="email" autocomplete="off"><div style="font-size:0.78rem;color:var(--ink-3);margin-top:0.25rem">Se usa solo para avisar los vencimientos de este cliente. Es opcional.</div></div>
     <div class="fld"><label>Servicio principal</label><select id="ci-s"><option>Asesoramiento integral</option><option>Sueldos + Impuestos</option><option>Contabilidad general</option><option>Monotributo</option><option>Balance + DDJJ</option></select></div>
     <div class="fld"><label>Estado</label><select id="ci-e"><option>Activo</option><option>En proceso</option><option>Inactivo</option></select></div>
   </div>
@@ -871,7 +882,7 @@
   <div class="mh"><h3>Carga masiva de vencimientos</h3><button class="x" data-close="m-imp">×</button></div>
   <div class="mb">
     <div class="helpbox">
-      Pegá las filas desde <b>Excel</b> (o elegí un archivo <b>.csv</b>). Una fila por vencimiento, con estas columnas:<br>
+      Copiá las filas en <b>Excel</b> y pegalas en la grilla de abajo: hacé clic en la primera celda y pegá (Ctrl+V). Cada dato cae en su columna. También podés escribir a mano o elegir un archivo <b>.csv</b>. Una fila por vencimiento, con estas columnas:<br>
       <b>Descripción · Tipo · Terminación · Fecha · Cliente</b><br>
       • <b>Terminación</b>: el último dígito del CUIT (<code>3</code>), varios (<code>0-1</code> o <code>0,1</code>). Se carga a todos los clientes activos que terminen así.<br>
       • <b>Cliente</b> (opcional): nombre o CUIT. Si lo completás, el vencimiento es solo para ese cliente. Si dejás ambos vacíos, es un vencimiento general del estudio.<br>
@@ -888,15 +899,17 @@
         </tbody>
       </table>
     </div>
-    <div class="fld"><textarea class="big" id="im-txt" placeholder="Pegá acá las filas copiadas desde Excel…"></textarea></div>
+    <div class="im-gw"><table class="im-grid"><thead><tr><th>#</th><th>Descripción</th><th>Tipo</th><th>Terminación</th><th>Fecha</th><th>Cliente (opcional)</th><th></th></tr></thead><tbody id="im-gb"></tbody></table></div>
     <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+      <button type="button" class="btn btn-soft btn-sm" id="im-addrow">＋ Agregar fila</button>
+      <button type="button" class="btn btn-soft btn-sm" id="im-clear">Vaciar grilla</button>
       <input type="file" id="im-file" accept=".csv,.txt,.tsv" style="display:none">
       <button type="button" class="btn btn-soft btn-sm" id="im-pick">📎 Elegir archivo CSV</button>
       <button type="button" class="btn btn-soft btn-sm" id="im-plantilla">⬇ Descargar plantilla para Excel</button>
       <span id="im-file-info" style="font-size:0.82rem;color:var(--ink-2)"></span>
     </div>
     <div class="fld"><label>Estado de los vencimientos cargados</label><select id="im-e"><option>Pendiente</option><option>En proceso</option><option>Cumplido</option></select></div>
-    <div class="fld" style="margin-bottom:0"><label>Vista previa</label><div class="prev" id="im-prev"><div class="empty" style="padding:1.2rem">Pegá las filas arriba para ver cómo se van a cargar.</div></div></div>
+    <div class="fld" style="margin-bottom:0"><label>Vista previa</label><div class="prev" id="im-prev"><div class="empty" style="padding:1.2rem">Pegá las filas en la grilla para ver cómo se van a cargar.</div></div></div>
   </div>
   <div class="mf"><span class="sum" id="im-sum"></span><button class="btn btn-soft" data-close="m-imp">Cancelar</button><button class="btn btn-pri" id="im-ok" disabled>Importar</button></div>
 </div></div>
@@ -1065,7 +1078,7 @@
         api('/api/carpetas').catch(()=>[])
       ]);
       DB.carpetas = (carp||[]).map(c=>({ id:String(c.id), cli:String(c.cliente_id), nombre:c.nombre }));
-      DB.clientes = cli.map(c=>({ id:String(c.id), nombre:c.nombre, cuit:c.cuit, whatsapp:c.whatsapp||'', honorarios:c.honorarios, servicio:c.servicio, estado:c.estado }));
+      DB.clientes = cli.map(c=>({ id:String(c.id), nombre:c.nombre, cuit:c.cuit, email:c.email_alertas||'', honorarios:c.honorarios, servicio:c.servicio, estado:c.estado }));
       DB.venc = ven.map(v=>({ id:String(v.id), desc:v.descripcion, cli:v.cliente_id?String(v.cliente_id):'', tipo:v.tipo, fecha:(v.fecha||'').slice(0,10), estado:v.estado }));
       DB.docs = doc.map(d=>({ id:String(d.id), nombre:d.nombre, tipo:d.tipo, cli:d.cliente_id?String(d.cliente_id):'', carp:d.carpeta_id?String(d.carpeta_id):'', fecha:(d.fecha||'').slice(0,10), archivo_mime:d.archivo_mime||null }));
       aplicarAlcanceRol();
@@ -1205,8 +1218,8 @@
   // ── CLIENTES ──
   function cliModal(id){
     $('cliTitle').textContent = id ? 'Editar cliente' : 'Nuevo cliente';
-    if(id){ const c=DB.clientes.find(x=>x.id===id); $('ci-id').value=c.id; $('ci-n').value=c.nombre; $('ci-c').value=c.cuit||''; $('ci-w').value=c.whatsapp||''; $('ci-h').value=c.honorarios||''; $('ci-s').value=c.servicio; $('ci-e').value=c.estado; }
-    else { $('ci-id').value=''; $('ci-n').value=''; $('ci-c').value=''; $('ci-w').value=''; $('ci-h').value=''; $('ci-s').value='Asesoramiento integral'; $('ci-e').value='Activo'; }
+    if(id){ const c=DB.clientes.find(x=>x.id===id); $('ci-id').value=c.id; $('ci-n').value=c.nombre; $('ci-c').value=c.cuit||''; $('ci-m').value=c.email||''; $('ci-h').value=c.honorarios||''; $('ci-s').value=c.servicio; $('ci-e').value=c.estado; }
+    else { $('ci-id').value=''; $('ci-n').value=''; $('ci-c').value=''; $('ci-m').value=''; $('ci-h').value=''; $('ci-s').value='Asesoramiento integral'; $('ci-e').value='Activo'; }
     openM('m-cli');
   }
     function formatCUIT(v){
@@ -1235,7 +1248,10 @@
     const idActual = $('ci-id').value;
     const dup = DB.clientes.find(c => c.cuit === cuit && c.id !== idActual);
     if(cuit && dup){ toast('Ya existe un cliente cargado con ese CUIT'); return; }
-    const data = { nombre, cuit, whatsapp:$('ci-w').value.trim(), honorarios:+$('ci-h').value||0, servicio:$('ci-s').value, estado:$('ci-e').value };
+    const mails = $('ci-m').value.split(/[,;\s]+/).map(x=>x.trim()).filter(Boolean);
+    const malo = mails.find(m=>!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(m));
+    if(malo){ toast('El mail "'+malo+'" no es válido'); return; }
+    const data = { nombre, cuit, email_alertas:mails.join(', '), honorarios:+$('ci-h').value||0, servicio:$('ci-s').value, estado:$('ci-e').value };
     const id = $('ci-id').value;
     try{
       if(id){ await api(`/api/clientes/${id}`,'PUT',data); } else { await api('/api/clientes','POST',data); }
@@ -1373,14 +1389,15 @@
     const lista = clientesFiltrados();
     [...SEL_CLI].forEach(id=>{ if(!lista.some(c=>c.id===id)) SEL_CLI.delete(id); });   // nunca queda marcado algo que el filtro oculta
     renderFbar();
-    if(DB.clientes.length && !lista.length){ t.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="e">▤</div>Ningún cliente coincide con los filtros. <button class="btn btn-soft btn-sm" id="fclear2" style="margin-left:0.6rem">Quitar filtros</button></div></td></tr>`; $('fclear2').addEventListener('click',limpiarFiltrosCli); actualizarSel(); return; }
-    if(!DB.clientes.length){ t.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="e">▤</div>Sin clientes cargados. Agregá el primero con el botón "+ Cliente".</div></td></tr>`; actualizarSel(); return; }
+    if(DB.clientes.length && !lista.length){ t.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="e">▤</div>Ningún cliente coincide con los filtros. <button class="btn btn-soft btn-sm" id="fclear2" style="margin-left:0.6rem">Quitar filtros</button></div></td></tr>`; $('fclear2').addEventListener('click',limpiarFiltrosCli); actualizarSel(); return; }
+    if(!DB.clientes.length){ t.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="e">▤</div>Sin clientes cargados. Agregá el primero con el botón "+ Cliente".</div></td></tr>`; actualizarSel(); return; }
     t.innerHTML = lista.map(c=>`<tr>
       <td class="selc"><input type="checkbox" data-sel-cli="${c.id}" ${SEL_CLI.has(c.id)?'checked':''} aria-label="Seleccionar ${esc(c.nombre)}"></td>
       <td><div class="nm">${esc(c.nombre)}</div></td>
       <td><span class="mono">${esc(c.cuit||'—')}</span></td>
       <td>${esc(c.servicio)}</td><td><strong>${money(c.honorarios)}</strong></td>
       <td>${estChip(c.estado)}</td>
+      <td style="max-width:14rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.email||'')}">${c.email?esc(c.email):'<span style="color:var(--ink-3)">—</span>'}</td>
       <td><div class="acts"><button class="ib" data-edit-cli="${c.id}">✎</button><button class="ib d" data-del-cli="${c.id}">×</button></div></td>
     </tr>`).join('');
     t.querySelectorAll('[data-edit-cli]').forEach(b=>b.addEventListener('click',()=>cliModal(b.dataset.editCli)));
@@ -1695,21 +1712,31 @@
     const parc=DB.clientes.filter(x=>norm(x.nombre).includes(n)); if(parc.length===1) return {c:parc[0]};
     return {error: parc.length>1 ? 'Hay varios clientes con ese nombre' : 'No se encontró el cliente'};
   }
-  function parseImport(texto){
+  // Ordena una tabla pegada/leída al orden fijo de la grilla: Descripción · Tipo · Terminación · Fecha · Cliente.
+  // Si la primera fila trae encabezados, se usan para ubicar cada columna y se descarta.
+  function normalizarPegado(filas, desdeCol){
+    if(!filas.length) return filas;
+    const cab=filas[0].map(x=>norm(x));
+    if(!desdeCol && cab.some(x=>/descrip|tipo|fecha|termin|cliente/.test(x)) && !filas[0].some(x=>parseFecha(x))){
+      const f=(re)=>cab.findIndex(x=>re.test(x));
+      const idx=[f(/descrip|vencim|concepto/),f(/^tipo/),f(/termin|digito/),f(/fecha/),f(/cliente|cuit|empresa/)];
+      return filas.slice(1).map(r=>idx.map(i=>i>=0?(r[i]||''):''));
+    }
+    return filas;
+  }
+  function textoAFilas(texto){
     const lineas=String(texto||'').split(/\r?\n/).filter(l=>l.trim());
     if(!lineas.length) return [];
     const d = lineas.some(l=>l.includes('\t')) ? '\t' : (lineas[0].includes(';') ? ';' : ',');
-    let filas=lineas.map(l=>splitFila(l,d));
-    let idx={desc:0,tipo:1,term:2,fecha:3,cli:4};
-    const cab=filas[0].map(x=>norm(x));
-    if(cab.some(x=>/descrip|tipo|fecha|termin|cliente/.test(x)) && !filas[0].some(x=>parseFecha(x))){
-      const f=(re)=>cab.findIndex(x=>re.test(x));
-      idx={desc:f(/descrip|vencim|concepto/),tipo:f(/^tipo/),term:f(/termin|digito/),fecha:f(/fecha/),cli:f(/cliente|cuit|empresa/)};
-      filas=filas.slice(1);
-    }
-    const g=(r,k)=> idx[k]>=0 ? (r[idx[k]]||'') : '';
+    return lineas.map(l=>splitFila(l,d));
+  }
+  function parseImport(filasGrilla){
+    const filas=[], nums=[];
+    filasGrilla.forEach((r,i)=>{ if(r.some(x=>String(x||'').trim())){ filas.push(r); nums.push(i+1); } });
+    if(!filas.length) return [];
+    const g=(r,k)=> (r[{desc:0,tipo:1,term:2,fecha:3,cli:4}[k]]||'');
     const ex=clavesExistentes(), vistos=new Set();
-    return filas.map((r,n)=>{
+    return filas.map((r,k)=>{ const n=nums[k] - 1;
       const desc=g(r,'desc').trim(), tipoTxt=g(r,'tipo'), term=g(r,'term').trim(), fTxt=g(r,'fecha'), cliTxt=g(r,'cli').trim();
       const o={n:n+1, desc, tipo:normTipo(tipoTxt), fecha:parseFecha(fTxt), term, cliTxt, items:[], err:'', aviso:''};
       if(!desc) o.err='Falta la descripción';
@@ -1738,10 +1765,10 @@
   }
   let IMP_ITEMS=[];
   function renderImpPrev(){
-    const filas=parseImport($('im-txt').value);
+    const filas=parseImport(IMP_ROWS);
     const box=$('im-prev');
     IMP_ITEMS = filas.flatMap(f=>f.items);
-    if(!filas.length){ box.innerHTML='<div class="empty" style="padding:1.2rem">Pegá las filas arriba para ver cómo se van a cargar.</div>'; $('im-sum').textContent=''; $('im-ok').disabled=true; $('im-ok').textContent='Importar'; return; }
+    if(!filas.length){ box.innerHTML='<div class="empty" style="padding:1.2rem">Pegá las filas en la grilla para ver cómo se van a cargar.</div>'; $('im-sum').textContent=''; $('im-ok').disabled=true; $('im-ok').textContent='Importar'; return; }
     box.innerHTML = `<table><thead><tr><th>#</th><th>Vencimiento</th><th>Fecha</th><th>Se carga a</th><th></th></tr></thead><tbody>${filas.map(f=>{
       const dest = f.err ? '—' : (f.items.length ? (f.items.length===1 ? (f.items[0]._c?esc(f.items[0]._c.nombre):'General del estudio') : `${f.items.length} clientes`) : '—');
       const st = f.err ? `<span class="st-bad">${esc(f.err)}</span>` : (f.aviso ? `<span class="st-warn">${esc(f.aviso)}</span>` : '<span class="st-ok">Listo</span>');
@@ -1767,7 +1794,36 @@
     const buf=await file.arrayBuffer();
     let t=new TextDecoder('utf-8').decode(buf);
     if(t.includes('�')) t=new TextDecoder('windows-1252').decode(buf);   // CSV guardado por Excel en Windows
-    $('im-txt').value=t.replace(/^﻿/,''); $('im-file-info').textContent=file.name; renderImpPrev();
+    IMP_ROWS = normalizarPegado(textoAFilas(t.replace(/^﻿/,'')));
+    $('im-file-info').textContent=file.name; renderImpGrid(); renderImpPrev();
+  }
+  // ── Grilla de pegado: cada columna con su propia celda ──
+  const IMP_COLS=5, IMP_MIN=8;
+  let IMP_ROWS=[];
+  function impPadding(){ while(IMP_ROWS.length<IMP_MIN) IMP_ROWS.push(['','','','','']); IMP_ROWS=IMP_ROWS.map(r=>{ r=r.slice(0,IMP_COLS); while(r.length<IMP_COLS) r.push(''); return r; }); }
+  function renderImpGrid(foco){
+    impPadding();
+    const ph=['IVA mensual','Impositivo','0-1','18/11/2026','Nombre o CUIT'];
+    $('im-gb').innerHTML = IMP_ROWS.map((r,i)=>`<tr><td class="rn">${i+1}</td>${r.map((v,c)=>`<td><input data-r="${i}" data-c="${c}" value="${esc(v)}" ${i===0?`placeholder="${ph[c]}"`:''} autocomplete="off" spellcheck="false"></td>`).join('')}<td class="rx"><button type="button" data-delrow="${i}" title="Quitar fila" aria-label="Quitar fila ${i+1}">✕</button></td></tr>`).join('');
+    if(foco){ const el=$('im-gb').querySelector(`input[data-r="${foco[0]}"][data-c="${foco[1]}"]`); if(el) el.focus(); }
+  }
+  function impPegar(e){
+    const inp=e.target.closest('input[data-r]'); if(!inp) return;
+    const txt=(e.clipboardData||window.clipboardData).getData('text');
+    if(!/[\t\n]/.test(txt.replace(/[\r\n]+$/,''))) return;      // un solo dato: se pega normal en la celda
+    e.preventDefault();
+    const r0=+inp.dataset.r, c0=+inp.dataset.c;
+    const filas=normalizarPegado(textoAFilas(txt), c0>0);
+    if(!filas.length) return;
+    // Si se pega con encabezado o desde la primera celda, el bloque empieza en la columna 0
+    const conCab = !(c0>0) && filas !== null && textoAFilas(txt).length!==filas.length;
+    const cIni = conCab ? 0 : c0;
+    filas.forEach((fila,i)=>{
+      while(IMP_ROWS.length<=r0+i) IMP_ROWS.push(['','','','','']);
+      fila.forEach((v,j)=>{ if(cIni+j<IMP_COLS) IMP_ROWS[r0+i][cIni+j]=v; });
+    });
+    renderImpGrid([Math.min(r0+filas.length-1,IMP_ROWS.length-1),cIni]); renderImpPrev();
+    $('im-file-info').textContent='';
   }
 
   // ── CARGA MASIVA DE DOCUMENTOS (muchos archivos de un cliente) ──
@@ -2346,8 +2402,16 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   $('lo-m1').addEventListener('click',()=>setLoteModo(1));
   $('lo-m2').addEventListener('click',()=>setLoteModo(2));
   $('lo-pares').addEventListener('change',e=>{ LOTE.pares=e.target.checked; if(LOTE.pares){ for(let d=0;d<10;d+=2) LOTE.dig[d+1]=LOTE.dig[d]; } renderLoteDigs(); renderLotePrev(); });
-  $('addImp').addEventListener('click',()=>{ $('im-txt').value=''; $('im-file').value=''; $('im-file-info').textContent=''; $('im-e').value='Pendiente'; renderImpPrev(); openM('m-imp'); });
-  $('im-txt').addEventListener('input',renderImpPrev);
+  $('addImp').addEventListener('click',()=>{ IMP_ROWS=[]; renderImpGrid(); $('im-file').value=''; $('im-file-info').textContent=''; $('im-e').value='Pendiente'; renderImpPrev(); openM('m-imp'); });
+  $('im-gb').addEventListener('input',e=>{ const i=e.target.closest('input[data-r]'); if(!i) return; IMP_ROWS[+i.dataset.r][+i.dataset.c]=i.value; renderImpPrev(); });
+  $('im-gb').addEventListener('paste',impPegar);
+  $('im-gb').addEventListener('keydown',e=>{
+    const i=e.target.closest('input[data-r]'); if(!i||e.key!=='Enter') return; e.preventDefault();
+    const r=+i.dataset.r+1, c=+i.dataset.c; if(r>=IMP_ROWS.length) IMP_ROWS.push(['','','','','']); renderImpGrid([r,c]);
+  });
+  $('im-gb').addEventListener('click',e=>{ const b=e.target.closest('[data-delrow]'); if(!b) return; IMP_ROWS.splice(+b.dataset.delrow,1); renderImpGrid(); renderImpPrev(); });
+  $('im-addrow').addEventListener('click',()=>{ IMP_ROWS.push(['','','','','']); renderImpGrid([IMP_ROWS.length-1,0]); });
+  $('im-clear').addEventListener('click',()=>{ IMP_ROWS=[]; $('im-file').value=''; $('im-file-info').textContent=''; renderImpGrid([0,0]); renderImpPrev(); });
   $('im-pick').addEventListener('click',()=>$('im-file').click());
   $('im-file').addEventListener('change',()=>{ const f=$('im-file').files[0]; if(f) leerArchivoImp(f); });
   $('im-plantilla').addEventListener('click',descargarPlantilla);

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS clientes (
   servicio    VARCHAR(255) NOT NULL DEFAULT 'Asesoramiento integral',
   honorarios  DECIMAL(12,2) NOT NULL DEFAULT 0,
   estado      VARCHAR(30)  NOT NULL DEFAULT 'Activo',
+  email_alertas VARCHAR(200) NULL,   -- mail(s) del cliente para avisarle sus vencimientos
   creado_en   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

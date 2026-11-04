@@ -97,6 +97,13 @@ function normalizarRol(r) { return ROLES_VALIDOS.includes(r) ? r : 'contador'; }
   } catch (e) {
     if (e.code !== 'ER_DUP_FIELDNAME') console.error('Migración carpeta_id:', e.message);
   }
+  // Mail del cliente para las alertas de vencimientos (opcional; puede haber varios separados por coma)
+  try {
+    await db.query('ALTER TABLE clientes ADD COLUMN email_alertas VARCHAR(200) NULL');
+    console.log('Migración: columna email_alertas agregada a clientes');
+  } catch (e) {
+    if (e.code !== 'ER_DUP_FIELDNAME') console.error('Migración email_alertas:', e.message);
+  }
   // Teléfono de WhatsApp del cliente (para el asistente de WhatsApp)
   try {
     await db.query('ALTER TABLE clientes ADD COLUMN whatsapp VARCHAR(25) NULL');
@@ -231,24 +238,39 @@ app.get('/api/clientes', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Error de base de datos' }); }
 });
 
+// Limpia y valida los mails de alertas: devuelve { valor } o { error }.
+function limpiarMails(txt) {
+  const lista = String(txt || '').split(/[,;\s]+/).map(x => x.trim().toLowerCase()).filter(Boolean);
+  const malo = lista.find(m => !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(m) || m.length > 120);
+  if (malo) return { error: `El mail "${malo}" no es válido` };
+  const unicos = [...new Set(lista)];
+  const valor = unicos.join(', ');
+  if (valor.length > 200) return { error: 'Hay demasiados mails: el máximo son 200 caracteres' };
+  return { valor: valor || null };
+}
+
 app.post('/api/clientes', async (req, res) => {
-  const { nombre, cuit, servicio, honorarios, estado, whatsapp } = req.body;
+  const { nombre, cuit, servicio, honorarios, estado, email_alertas } = req.body;
   if (!nombre) return res.status(400).json({ error: 'El nombre es obligatorio' });
+  const m = limpiarMails(email_alertas);
+  if (m.error) return res.status(400).json({ error: m.error });
   try {
     const [r] = await db.query(
-      'INSERT INTO clientes (nombre,cuit,servicio,honorarios,estado,whatsapp) VALUES (?,?,?,?,?,?)',
-      [nombre, cuit||null, servicio||'Asesoramiento integral', honorarios||0, estado||'Activo', (whatsapp||'').replace(/[^\d+]/g,'')||null]
+      'INSERT INTO clientes (nombre,cuit,servicio,honorarios,estado,email_alertas) VALUES (?,?,?,?,?,?)',
+      [nombre, cuit||null, servicio||'Asesoramiento integral', honorarios||0, estado||'Activo', m.valor]
     );
     res.status(201).json({ ok: true, id: r.insertId });
   } catch (e) { res.status(500).json({ error: 'Error al guardar' }); }
 });
 
 app.put('/api/clientes/:id', async (req, res) => {
-  const { nombre, cuit, servicio, honorarios, estado, whatsapp } = req.body;
+  const { nombre, cuit, servicio, honorarios, estado, email_alertas } = req.body;
+  const m = limpiarMails(email_alertas);
+  if (m.error) return res.status(400).json({ error: m.error });
   try {
     await db.query(
-      'UPDATE clientes SET nombre=?,cuit=?,servicio=?,honorarios=?,estado=?,whatsapp=? WHERE id=?',
-      [nombre, cuit||null, servicio||'Asesoramiento integral', honorarios||0, estado||'Activo', (whatsapp||'').replace(/[^\d+]/g,'')||null, req.params.id]
+      'UPDATE clientes SET nombre=?,cuit=?,servicio=?,honorarios=?,estado=?,email_alertas=? WHERE id=?',
+      [nombre, cuit||null, servicio||'Asesoramiento integral', honorarios||0, estado||'Activo', m.valor, req.params.id]
     );
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: 'Error al actualizar' }); }

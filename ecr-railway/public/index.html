@@ -553,6 +553,52 @@
   .dm-bar { height: 12px; background: var(--line-soft); border-radius: 6px; overflow: hidden; margin-top: 0.8rem; display: none; }
   .dm-bar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .2s; }
   @media (max-width: 700px) { .dm-row { grid-template-columns: 26px 1fr 30px; } .dm-row select, .dm-row .sz { grid-column: 2; text-align: left; } }
+
+  /* ─── CELULAR: menú lateral como cajón + ajustes de pantalla chica ─── */
+  .burger { display:none; flex-shrink:0; width:44px; height:44px; border:1.5px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); font-size:1.4rem; line-height:1; cursor:pointer; align-items:center; justify-content:center; }
+  .side-bg { display:none; }
+  @media (max-width: 920px) {
+    .burger { display:flex; }
+    .side { display:flex !important; position:fixed; left:0; top:0; bottom:0; height:100%; width:280px; max-width:84vw; z-index:150; transform:translateX(-105%); transition:transform .25s ease; box-shadow:var(--shadow-lg); }
+    body.menu-open .side { transform:none; }
+    body.menu-open .side-bg { display:block; position:fixed; inset:0; background:rgba(20,28,42,.55); z-index:140; }
+    .menu { -webkit-overflow-scrolling:touch; }
+    .menu-i { padding:0.85rem 0.9rem; }
+    .top { padding:0.7rem 1rem; gap:0.7rem; flex-wrap:wrap; }
+    .top h1 { font-size:1.15rem; }
+    .top .bc { display:none; }
+    .top-r { gap:0.5rem; }
+    .user-info { display:none; }
+    .body { padding:1rem 0.9rem 2rem; }
+    .panel { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .panel table { min-width:820px; }
+    .modal, .modal.wide, .modal.xl, .modal.alerta, .modal.confirm { width:96vw !important; max-width:96vw; max-height:92vh; }
+    .mb { padding:1rem; } .mh, .mf { padding:0.9rem 1rem; }
+    .im-gw { overflow-x:auto; }
+    .toast { max-width:92vw; text-align:center; }
+  }
+  @media (max-width: 560px) {
+    .row4 { grid-template-columns:1fr 1fr; gap:0.7rem; }
+    .top-r { display:contents; }
+    .top > div:nth-of-type(1) { flex:1; min-width:0; }
+    .srch { width:100%; flex:1 1 100%; order:9; }
+    #newBtn { padding:0.5rem 0.8rem; white-space:nowrap; }
+    .tbar { flex-wrap:wrap; gap:0.6rem; }
+    .tbar .r { flex-wrap:wrap; gap:0.4rem; width:100%; }
+    .tbar .r .btn { flex:1 1 auto; font-size:0.8rem; padding:0.5rem 0.6rem; }
+    .calh { flex-wrap:wrap; gap:0.6rem; padding:0.8rem; }
+    .caln { flex-wrap:wrap; }
+    .cal { overflow:hidden; }
+    .cg { grid-template-columns:repeat(7,minmax(0,1fr)); }
+    .dow { padding:0.4rem 0; font-size:0.58rem; letter-spacing:0; }
+    .cc { min-height:52px; padding:0.2rem; overflow:hidden; }
+    .cc .dn { font-size:0.75rem; }
+    .ev { font-size:0 !important; height:5px; padding:0 !important; margin-bottom:2px; border-radius:3px; }
+    .ev * { display:none; }
+    .cal-leg { padding:0.6rem 0.8rem; }
+    .btn { min-height:40px; }
+    .fbar { gap:0.4rem; }
+  }
 </style>
 </head>
 <body>
@@ -567,6 +613,7 @@
 
 <div class="app">
   <!-- SIDEBAR -->
+  <div class="side-bg" id="sideBg"></div>
   <aside class="side">
     <div class="brand">
       <img class="brand-logo" src="/logo-oscuro.png" alt="ECR · Estudio Casil Rodríguez · 50 años">
@@ -591,6 +638,7 @@
   <!-- MAIN -->
   <div class="main">
     <header class="top">
+      <button class="burger" id="burger" aria-label="Abrir menú">☰</button>
       <div>
         <h1 id="vT">Panel general</h1>
         <div class="bc" id="vS">Resumen del estudio</div>
@@ -1204,7 +1252,9 @@
     if(v==='agenda') renderCal();
     if(v==='usuarios') loadUsuarios().then(renderUsuarios);
   }
-  document.querySelectorAll('.menu-i').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.v)));
+  document.querySelectorAll('.menu-i').forEach(b=>b.addEventListener('click',()=>{ nav(b.dataset.v); document.body.classList.remove('menu-open'); }));
+  $('burger').addEventListener('click',()=>document.body.classList.toggle('menu-open'));
+  $('sideBg').addEventListener('click',()=>document.body.classList.remove('menu-open'));
   document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.go)));
   $('newBtn').addEventListener('click',()=>{
     const v = document.querySelector('.menu-i.on').dataset.v;

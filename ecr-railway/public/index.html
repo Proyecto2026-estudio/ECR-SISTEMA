@@ -786,6 +786,11 @@
           </div>
         </div></div>
 
+        <div class="panel" style="max-width:560px;margin-bottom:1.25rem"><div class="ph"><h3>Alertas por mail</h3></div><div class="pb">
+          <p style="font-size:0.83rem;color:var(--ink-2);margin-bottom:0.7rem;line-height:1.6">El sistema le manda un mail al estudio cuando falten 7 días para un vencimiento. Con este botón se envía un mail de prueba para comprobar que llega.</p>
+          <button class="btn btn-soft" id="mailTest">Enviar mail de prueba</button> <span id="mailTestRes" style="font-size:0.85rem;margin-left:0.5rem"></span>
+        </div></div>
+
         <div class="panel" style="max-width:560px"><div class="ph"><h3>Conectar el asistente (IA)</h3><span class="chip gold"><span class="dt"></span>gratis con Gemini</span></div><div class="pb">
           <p style="font-size:0.83rem;color:var(--ink-2);margin-bottom:0.5rem;line-height:1.6">Para que el asistente responda <b>cualquier pregunta</b> y busque en la web desde tu hosting, conectalo con una clave gratuita de <b>Google Gemini</b>:</p>
           <ol style="font-size:0.82rem;color:var(--ink-2);margin:0 0 1rem 1.1rem;line-height:1.7">
@@ -2470,6 +2475,14 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   if($('usrSave')) $('usrSave').addEventListener('click',usrSave);
   if($('ui-r')) $('ui-r').addEventListener('change', e=>{ $('ui-cli-wrap').style.display = e.target.value==='cliente_pyme' ? '' : 'none'; });
   $('cfgSave').addEventListener('click',()=>toast('Configuración guardada ✓'));
+  $('mailTest').addEventListener('click',async()=>{
+    const b=$('mailTest'), r=$('mailTestRes'); b.disabled=true; r.style.color='var(--ink-2)'; r.textContent='Enviando…';
+    try{ const x=await api('/api/alertas/ejecutar?prueba=1','POST',{});
+      if(x.enviado){ r.style.color='var(--green, #15803d)'; r.textContent='✓ Enviado. Revisá la casilla del estudio (y el correo no deseado).'; }
+      else { r.style.color='var(--red)'; r.textContent=x.motivo||'No se pudo enviar'; }
+    }catch(e){ r.style.color='var(--red)'; r.textContent=e.message||'No se pudo enviar'; }
+    b.disabled=false;
+  });
   // API key del asistente (Google Gemini)
  function refreshKeyStatus(){ const el=$('key-status'); if(!el) return; el.textContent='● Conectado — el asistente responde cualquier pregunta'; el.style.color='var(--green)'; }
   $('keySave').addEventListener('click',()=>{ const v=$('cfg-key').value.trim(); try{ if(v) localStorage.setItem('ecr-gemini',v); }catch(e){} refreshKeyStatus(); toast(v?'Clave guardada ✓':'Pegá una clave primero'); });

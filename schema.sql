@@ -33,3 +33,13 @@ CREATE TABLE IF NOT EXISTS documentos (
   creado_en   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_doc_cliente FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL
 );
+
+-- Subcarpetas dentro de la carpeta de un cliente (el servidor las crea solo al iniciar)
+CREATE TABLE IF NOT EXISTS carpetas (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  cliente_id  INT NOT NULL,
+  nombre      VARCHAR(60) NOT NULL,
+  creado_en   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_carpeta (cliente_id, nombre)
+);
+-- documentos.carpeta_id INT NULL (se agrega solo al iniciar el servidor)

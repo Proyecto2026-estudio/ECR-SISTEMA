@@ -81,6 +81,22 @@ function normalizarRol(r) { return ROLES_VALIDOS.includes(r) ? r : 'contador'; }
   } catch (e) {
     if (e.code !== 'ER_DUP_FIELDNAME') console.error('Migración cliente_id:', e.message);
   }
+  // Subcarpetas dentro de la carpeta de cada cliente (por ejemplo, una por banco).
+  try {
+    await db.query(`CREATE TABLE IF NOT EXISTS carpetas (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      cliente_id INT NOT NULL,
+      nombre VARCHAR(60) NOT NULL,
+      creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_carpeta (cliente_id, nombre)
+    )`);
+  } catch (e) { console.error('Migración carpetas:', e.message); }
+  try {
+    await db.query('ALTER TABLE documentos ADD COLUMN carpeta_id INT NULL');
+    console.log('Migración: columna carpeta_id agregada a documentos');
+  } catch (e) {
+    if (e.code !== 'ER_DUP_FIELDNAME') console.error('Migración carpeta_id:', e.message);
+  }
   // Teléfono de WhatsApp del cliente (para el asistente de WhatsApp)
   try {
     await db.query('ALTER TABLE clientes ADD COLUMN whatsapp VARCHAR(25) NULL');
@@ -323,7 +339,7 @@ app.get('/api/documentos', requireAuth, async (req, res) => {
     if (u.rol === 'cliente_pyme' && !u.cliente_id) return res.json([]);
     const soloMio = u.rol === 'cliente_pyme';
     const [rows] = await db.query(
-      `SELECT d.id, d.nombre, d.tipo, d.cliente_id, d.fecha, d.archivo_mime, d.archivo_nombre_original, c.nombre AS cliente_nombre
+      `SELECT d.id, d.nombre, d.tipo, d.cliente_id, d.carpeta_id, d.fecha, d.archivo_mime, d.archivo_nombre_original, c.nombre AS cliente_nombre
        FROM documentos d
        LEFT JOIN clientes c ON d.cliente_id = c.id
        ${soloMio ? 'WHERE d.cliente_id = ?' : ''}
@@ -348,9 +364,15 @@ app.post('/api/documentos', requireAuth, async (req, res) => {
       if (!us[0].cliente_id) return res.status(403).json({ error: 'Tu usuario no tiene un cliente asociado' });
       cliente_id = us[0].cliente_id;
     }
+    // La carpeta elegida tiene que ser del mismo cliente; si no, el documento queda en la carpeta principal.
+    let carpetaId = req.body.carpeta_id || null;
+    if (carpetaId) {
+      const [cp] = await db.query('SELECT id FROM carpetas WHERE id = ? AND cliente_id = ?', [carpetaId, cliente_id]);
+      if (!cp.length) carpetaId = null;
+    }
     const [r] = await db.query(
-      'INSERT INTO documentos (nombre,tipo,cliente_id,fecha,archivo_data,archivo_mime,archivo_nombre_original) VALUES (?,?,?,?,?,?,?)',
-      [nombre, tipo||'Otro', cliente_id||null, fecha||new Date().toISOString().slice(0,10), archivo_data||null, archivo_mime||null, archivo_nombre_original||null]
+      'INSERT INTO documentos (nombre,tipo,cliente_id,carpeta_id,fecha,archivo_data,archivo_mime,archivo_nombre_original) VALUES (?,?,?,?,?,?,?,?)',
+      [nombre, tipo||'Otro', cliente_id||null, carpetaId, fecha||new Date().toISOString().slice(0,10), archivo_data||null, archivo_mime||null, archivo_nombre_original||null]
     );
     res.status(201).json({ ok: true, id: r.insertId });
   } catch (e) { res.status(500).json({ error: 'Error al guardar' }); }
@@ -382,6 +404,92 @@ app.delete('/api/documentos/:id', requireAuth, async (req, res) => {
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: 'Error al eliminar' }); }
 });
+// ══════════════════════════════════════════════════════════
+//  CARPETAS dentro de la carpeta de un cliente (p. ej. una por banco)
+// ══════════════════════════════════════════════════════════
+// Devuelve el usuario o responde el error. El Cliente PyME solo toca lo de su empresa;
+// el rol de solo lectura no puede crear ni cambiar nada.
+async function permisoCarpetas(req, res) {
+  const u = await usuarioActual(req);
+  if (!u) { sinSesion(res); return null; }
+  if (u.rol === 'lectura') { res.status(403).json({ error: 'Tu rol no puede modificar carpetas' }); return null; }
+  if (u.rol === 'cliente_pyme' && !u.cliente_id) { res.status(403).json({ error: 'Tu usuario no tiene un cliente asociado' }); return null; }
+  return u;
+}
+const nombreCarpeta = v => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, 60);
+
+app.get('/api/carpetas', requireAuth, async (req, res) => {
+  try {
+    const u = await usuarioActual(req);
+    if (!u) return sinSesion(res);
+    if (u.rol === 'cliente_pyme' && !u.cliente_id) return res.json([]);
+    const soloMio = u.rol === 'cliente_pyme';
+    const [rows] = await db.query(
+      `SELECT id, cliente_id, nombre FROM carpetas ${soloMio ? 'WHERE cliente_id = ?' : ''} ORDER BY nombre ASC`,
+      soloMio ? [u.cliente_id] : []);
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: 'Error de base de datos' }); }
+});
+
+app.post('/api/carpetas', requireAuth, async (req, res) => {
+  try {
+    const u = await permisoCarpetas(req, res); if (!u) return;
+    const nombre = nombreCarpeta(req.body.nombre);
+    if (!nombre) return res.status(400).json({ error: 'Escribí un nombre para la carpeta' });
+    const clienteId = u.rol === 'cliente_pyme' ? u.cliente_id : req.body.cliente_id;
+    if (!clienteId) return res.status(400).json({ error: 'Falta el cliente' });
+    const [dup] = await db.query('SELECT id FROM carpetas WHERE cliente_id = ? AND nombre = ?', [clienteId, nombre]);
+    if (dup.length) return res.status(409).json({ error: 'Ya existe una carpeta con ese nombre' });
+    const [r] = await db.query('INSERT INTO carpetas (cliente_id, nombre) VALUES (?, ?)', [clienteId, nombre]);
+    res.status(201).json({ ok: true, id: r.insertId, nombre });
+  } catch (e) { res.status(500).json({ error: 'Error al crear la carpeta' }); }
+});
+
+app.put('/api/carpetas/:id', requireAuth, async (req, res) => {
+  try {
+    const u = await permisoCarpetas(req, res); if (!u) return;
+    const [c] = await db.query('SELECT id, cliente_id FROM carpetas WHERE id = ?', [req.params.id]);
+    if (!c.length) return res.status(404).json({ error: 'No existe la carpeta' });
+    if (u.rol === 'cliente_pyme' && String(c[0].cliente_id) !== String(u.cliente_id)) return res.status(403).json({ error: 'No tenés acceso a esta carpeta' });
+    const nombre = nombreCarpeta(req.body.nombre);
+    if (!nombre) return res.status(400).json({ error: 'Escribí un nombre para la carpeta' });
+    const [dup] = await db.query('SELECT id FROM carpetas WHERE cliente_id = ? AND nombre = ? AND id <> ?', [c[0].cliente_id, nombre, c[0].id]);
+    if (dup.length) return res.status(409).json({ error: 'Ya existe una carpeta con ese nombre' });
+    await db.query('UPDATE carpetas SET nombre = ? WHERE id = ?', [nombre, c[0].id]);
+    res.json({ ok: true, nombre });
+  } catch (e) { res.status(500).json({ error: 'Error al renombrar la carpeta' }); }
+});
+
+// Borrar una carpeta NO borra sus documentos: vuelven a la carpeta principal del cliente.
+app.delete('/api/carpetas/:id', requireAuth, async (req, res) => {
+  try {
+    const u = await permisoCarpetas(req, res); if (!u) return;
+    const [c] = await db.query('SELECT id, cliente_id FROM carpetas WHERE id = ?', [req.params.id]);
+    if (!c.length) return res.status(404).json({ error: 'No existe la carpeta' });
+    if (u.rol === 'cliente_pyme' && String(c[0].cliente_id) !== String(u.cliente_id)) return res.status(403).json({ error: 'No tenés acceso a esta carpeta' });
+    await db.query('UPDATE documentos SET carpeta_id = NULL WHERE carpeta_id = ?', [c[0].id]);
+    await db.query('DELETE FROM carpetas WHERE id = ?', [c[0].id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Error al eliminar la carpeta' }); }
+});
+
+// Mover un documento a una carpeta (o a la principal con carpeta_id = null). No cambia el archivo.
+app.put('/api/documentos/:id/carpeta', requireAuth, async (req, res) => {
+  try {
+    const u = await permisoCarpetas(req, res); if (!u) return;
+    const [d] = await db.query('SELECT id, cliente_id FROM documentos WHERE id = ?', [req.params.id]);
+    if (!d.length) return res.status(404).json({ error: 'No existe el documento' });
+    if (u.rol === 'cliente_pyme' && String(d[0].cliente_id) !== String(u.cliente_id)) return res.status(403).json({ error: 'No tenés acceso a este documento' });
+    let destino = req.body.carpeta_id || null;
+    if (destino) {
+      const [cp] = await db.query('SELECT id FROM carpetas WHERE id = ? AND cliente_id = ?', [destino, d[0].cliente_id]);
+      if (!cp.length) return res.status(400).json({ error: 'Esa carpeta no es del mismo cliente' });
+    }
+    await db.query('UPDATE documentos SET carpeta_id = ? WHERE id = ?', [destino, d[0].id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Error al mover el documento' }); }
+});
+
 // ══════════════════════════════════════════════════════════
 //  ASISTENTE (proxy a Gemini, clave guardada en el servidor)
 // ══════════════════════════════════════════════════════════

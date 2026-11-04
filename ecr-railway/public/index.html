@@ -502,6 +502,9 @@
   .im-ej th { text-align: left; font-weight: 600; color: var(--ink-2); padding: 0.25rem 0.6rem; border-bottom: 1.5px solid var(--line); white-space: nowrap; }
   .im-ej td { padding: 0.28rem 0.6rem; border-bottom: 1px solid var(--line-soft); white-space: nowrap; color: var(--ink); }
   .im-ej tr:last-child td { border-bottom: none; }
+  .carp-bar { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 0 0 1rem; }
+  .doc.subf .di { font-size: 2.2rem; }
+  .doc .en-carp { font-size: 0.76rem; color: var(--gold); font-weight: 600; }
   #ex-drop { padding: 2rem 1rem; }
   .ex-chosen { display: flex; align-items: center; gap: 0.8rem; margin-top: 0.9rem; padding: 0.7rem 0.9rem; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
   .ex-chosen .ex-ic { font-size: 1.6rem; }
@@ -655,7 +658,12 @@
       <!-- DOCS -->
       <section class="view" id="v-docs">
         <div class="tbar"><h2>Archivo digital</h2><div class="r"><div class="lupa"><span class="lp">🔍</span><input id="doc-q" type="search" placeholder="Buscar cliente o documento…" autocomplete="off"></div><button class="btn btn-soft" id="addDocMasa" title="Subir muchos archivos de un cliente de una sola vez">⇪ Carga masiva</button><button class="btn btn-pri" id="addDoc">+ Documento</button></div></div>
-        <div class="docs-back" id="docs-back" style="display:none"><button class="btn btn-soft" id="doc-back">← Todos los clientes</button><h3 id="doc-cli-t"></h3><div id="doc-selbar"><label><input type="checkbox" id="doc-all"> Seleccionar todos</label><button class="btn btn-danger" id="doc-delsel" style="display:none"><span>🗑 Eliminar seleccionados (<span id="doc-delsel-n">0</span>)</span></button></div></div>
+        <div class="docs-back" id="docs-back" style="display:none"><button class="btn btn-soft" id="doc-back">← Todos los clientes</button><button class="btn btn-soft" id="doc-up" style="display:none">← Volver</button><h3 id="doc-cli-t"></h3><div id="doc-selbar"><label><input type="checkbox" id="doc-all"> Seleccionar todos</label><button class="btn btn-danger" id="doc-delsel" style="display:none"><span>🗑 Eliminar seleccionados (<span id="doc-delsel-n">0</span>)</span></button></div></div>
+        <div class="carp-bar" id="carp-bar" style="display:none">
+          <button class="btn btn-soft" id="carp-new" type="button">＋ Nueva carpeta</button>
+          <button class="btn btn-soft" id="carp-ren" type="button" style="display:none">✎ Renombrar</button>
+          <button class="btn btn-soft" id="carp-del" type="button" style="display:none;color:var(--red);border-color:var(--red)">🗑 Eliminar carpeta</button>
+        </div>
         <div class="docs" id="g-docs"></div>
       </section>
 
@@ -893,6 +901,7 @@
   <div class="mh"><h3>Carga masiva de documentos</h3><button class="x" data-close="m-dmasa">×</button></div>
   <div class="mb">
     <div class="fld"><label>Cliente al que pertenecen los documentos</label><select id="dm-c"></select></div>
+    <div class="fld" id="dm-carp-wrap" style="display:none"><label>Carpeta</label><select id="dm-carp"></select></div>
     <div class="dropzone" id="dm-drop" tabindex="0" role="button" aria-label="Elegir archivos">
       <div class="big">📂</div>
       <div><b>Arrastrá acá los archivos</b> o tocá para elegirlos</div>
@@ -927,6 +936,26 @@
 </div>
   </div>
   <div class="mf"><button class="btn btn-soft" data-close="m-doc">Cancelar</button><button class="btn btn-pri" id="docSave">Cargar documento</button></div>
+</div></div>
+
+<!-- MODAL CARPETA (nueva / renombrar) -->
+<div class="ov" id="m-carp"><div class="modal">
+  <div class="mh"><h3 id="carp-t">Nueva carpeta</h3><button class="x" data-close="m-carp">×</button></div>
+  <div class="mb">
+    <div class="fld"><label>Nombre de la carpeta</label><input id="carp-n" maxlength="60" placeholder="Banco Galicia" autocomplete="off"></div>
+    <div style="font-size:0.82rem;color:var(--ink-2)">Sirve para ordenar tus documentos, por ejemplo una carpeta por cada banco.</div>
+  </div>
+  <div class="mf"><button class="btn btn-soft" data-close="m-carp">Cancelar</button><button class="btn btn-pri" id="carp-ok">Guardar</button></div>
+</div></div>
+
+<!-- MODAL MOVER DOCUMENTO -->
+<div class="ov" id="m-mover"><div class="modal">
+  <div class="mh"><h3>Mover documento</h3><button class="x" data-close="m-mover">×</button></div>
+  <div class="mb">
+    <div style="font-weight:600;margin-bottom:0.7rem" id="mv-doc"></div>
+    <div class="fld"><label>Mover a</label><select id="mv-sel"></select></div>
+  </div>
+  <div class="mf"><button class="btn btn-soft" data-close="m-mover">Cancelar</button><button class="btn btn-pri" id="mv-ok">Mover</button></div>
 </div></div>
 
 <!-- MODAL USUARIO -->
@@ -973,7 +1002,7 @@
 
   // ── conexión con el backend (Railway) ──
  const API_BASE = 'https://ecr-sistema.up.railway.app';
-  const DB = { clientes:[], venc:[], docs:[] };
+  const DB = { clientes:[], venc:[], docs:[], carpetas:[] };
 
   // ── USUARIO ACTUAL Y ROLES ──
   const USUARIO_ACTUAL = (()=>{ try{ return JSON.parse(localStorage.getItem('ecr_usuario')||'null'); }catch(e){ return null; } })();
@@ -997,6 +1026,7 @@
       DB.clientes = DB.clientes.filter(c=>c.id===MI_CLIENTE_ID);
       DB.venc = DB.venc.filter(v=>v.cli===MI_CLIENTE_ID);
       DB.docs = DB.docs.filter(d=>d.cli===MI_CLIENTE_ID);
+      DB.carpetas = DB.carpetas.filter(c=>c.cli===MI_CLIENTE_ID);
     }
   }
   function aplicarPermisosUI(){
@@ -1025,12 +1055,14 @@
   }
   async function loadAll(){
     try{
-      const [cli, ven, doc] = await Promise.all([
-        api('/api/clientes'), api('/api/vencimientos'), api('/api/documentos')
+      const [cli, ven, doc, carp] = await Promise.all([
+        api('/api/clientes'), api('/api/vencimientos'), api('/api/documentos'),
+        api('/api/carpetas').catch(()=>[])
       ]);
+      DB.carpetas = (carp||[]).map(c=>({ id:String(c.id), cli:String(c.cliente_id), nombre:c.nombre }));
       DB.clientes = cli.map(c=>({ id:String(c.id), nombre:c.nombre, cuit:c.cuit, whatsapp:c.whatsapp||'', honorarios:c.honorarios, servicio:c.servicio, estado:c.estado }));
       DB.venc = ven.map(v=>({ id:String(v.id), desc:v.descripcion, cli:v.cliente_id?String(v.cliente_id):'', tipo:v.tipo, fecha:(v.fecha||'').slice(0,10), estado:v.estado }));
-      DB.docs = doc.map(d=>({ id:String(d.id), nombre:d.nombre, tipo:d.tipo, cli:d.cliente_id?String(d.cliente_id):'', fecha:(d.fecha||'').slice(0,10), archivo_mime:d.archivo_mime||null }));
+      DB.docs = doc.map(d=>({ id:String(d.id), nombre:d.nombre, tipo:d.tipo, cli:d.cliente_id?String(d.cliente_id):'', carp:d.carpeta_id?String(d.carpeta_id):'', fecha:(d.fecha||'').slice(0,10), archivo_mime:d.archivo_mime||null }));
       aplicarAlcanceRol();
     }catch(e){ toast('No se pudo conectar con el servidor'); }
   }
@@ -1710,6 +1742,7 @@
       $('dm-c').innerHTML = DB.clientes.map(c=>`<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
       $('dm-c').value = MI_CLIENTE_ID || ''; $('dm-c').disabled = true;
     } else $('dm-c').disabled = false;
+    dmCarpetas();
     DM.files=[]; DM.subiendo=false; $('dm-file').value='';
     $('dm-bar').style.display='none'; $('dm-bar-i').style.width='0';
     renderDM(); openM('m-dmasa');
@@ -1759,7 +1792,7 @@
       const x=pend[i];
       $('dm-ok').textContent=`Subiendo ${i+1}/${pend.length}…`;
       try{
-        const data={ nombre:x.nombre.trim(), tipo:x.tipo, cliente_id:cli, fecha:hoy,
+        const data={ nombre:x.nombre.trim(), tipo:x.tipo, cliente_id:cli, carpeta_id: $('dm-carp').value||null, fecha:hoy,
           archivo_data: await fileToBase64(x.file), archivo_mime: x.file.type||'application/octet-stream', archivo_nombre_original: x.file.name };
         await api('/api/documentos','POST',data); x.estado='ok'; ok++;
       }catch(e){ x.estado='error'; fail++; }
@@ -1768,7 +1801,7 @@
     DM.subiendo=false; $('dm-cancel').disabled=false;
     await loadAll();
     if(!fail){
-      DOC_CLI = cli||''; SEL_DOC.clear(); renderAll(); closeM('m-dmasa');
+      DOC_CLI = cli||''; DOC_SUB = $('dm-carp').value || null; SEL_DOC.clear(); renderAll(); closeM('m-dmasa');
       toast(`${ok} documento${ok===1?'':'s'} subido${ok===1?'':'s'} ✓`);
     } else {
       renderAll(); DM.files=DM.files.filter(x=>x.estado!=='ok'); renderDM();
@@ -1776,6 +1809,47 @@
     }
   }
 
+  // ── Carpetas dentro de la carpeta del cliente ──
+  let CARP_EDIT = null, MOVER_DOC = null;
+  function carpModal(editar){
+    CARP_EDIT = editar || null;
+    const c = editar ? DB.carpetas.find(x=>x.id===editar) : null;
+    $('carp-t').textContent = c ? 'Renombrar carpeta' : 'Nueva carpeta';
+    $('carp-n').value = c ? c.nombre : ''; openM('m-carp'); setTimeout(()=>$('carp-n').focus(),50);
+  }
+  async function carpGuardar(){
+    const nombre = $('carp-n').value.replace(/\s+/g,' ').trim();
+    if(!nombre){ toast('Escribí un nombre para la carpeta'); return; }
+    try{
+      if(CARP_EDIT){ await api(`/api/carpetas/${CARP_EDIT}`,'PUT',{ nombre }); }
+      else { const r = await api('/api/carpetas','POST',{ nombre, cliente_id: ES_PYME ? MI_CLIENTE_ID : DOC_CLI }); }
+      await loadAll(); closeM('m-carp'); renderAll(); toast(CARP_EDIT ? 'Carpeta renombrada ✓' : 'Carpeta creada ✓');
+    }catch(e){ toast(e.message); }
+  }
+  async function carpBorrar(){
+    const c = DB.carpetas.find(x=>x.id===DOC_SUB); if(!c) return;
+    if(!await confirmar({ titulo:'¿Eliminar la carpeta “'+c.nombre+'”?', mensaje:'Los documentos NO se borran: vuelven a la carpeta principal.', ok:'Sí, eliminar carpeta' })) return;
+    try{ await api(`/api/carpetas/${c.id}`,'DELETE'); DOC_SUB=null; await loadAll(); renderAll(); toast('Carpeta eliminada'); }
+    catch(e){ toast(e.message); }
+  }
+  function moverModal(id){
+    const d = DB.docs.find(x=>x.id===id); if(!d) return;
+    MOVER_DOC = id; $('mv-doc').textContent = '📄 ' + d.nombre;
+    $('mv-sel').innerHTML = `<option value="">📁 Carpeta principal</option>` + carpsDe(d.cli).map(c=>`<option value="${c.id}">📂 ${esc(c.nombre)}</option>`).join('');
+    $('mv-sel').value = d.carp || ''; openM('m-mover');
+  }
+  async function moverGuardar(){
+    const id = MOVER_DOC; if(!id) return;
+    try{ await api(`/api/documentos/${id}/carpeta`,'PUT',{ carpeta_id: $('mv-sel').value || null }); await loadAll(); closeM('m-mover'); renderAll(); toast('Documento movido ✓'); }
+    catch(e){ toast(e.message); }
+  }
+  function dmCarpetas(){
+    const cli = (ES_PYME ? MI_CLIENTE_ID : $('dm-c').value) || '';
+    const cs = cli ? carpsDe(cli) : [];
+    $('dm-carp-wrap').style.display = cs.length ? '' : 'none';
+    $('dm-carp').innerHTML = `<option value="">📁 Carpeta principal</option>` + cs.map(c=>`<option value="${c.id}">📂 ${esc(c.nombre)}</option>`).join('');
+    $('dm-carp').value = (DOC_SUB && cs.some(c=>c.id===DOC_SUB) && String(DOC_CLI)===String(cli)) ? DOC_SUB : '';
+  }
   // Abrir un archivo: se pide al servidor con la sesión iniciada (ya no hay links abiertos).
   document.addEventListener('click', async e=>{
     const b = e.target.closest('[data-ver-doc]'); if(!b) return;
@@ -1846,6 +1920,9 @@ async function docSave(){
     SEL_DOC.clear(); await loadAll(); renderAll();
     toast(fallos?`No se pudieron eliminar ${fallos} documento(s)`:(ids.length===1?'Documento eliminado':`${ids.length} documentos eliminados`));
   }
+  let DOC_SUB = null;   // null = carpeta principal del cliente; id = subcarpeta abierta
+  const PUEDE_CARPETAS = !ES_LECTURA;
+  const carpsDe = cli => (DB.carpetas||[]).filter(c=>c.cli===cli);
   let DOC_CLI = null;   // null = lista de carpetas; '' = documentos generales; id = carpeta de ese cliente
   const norm = t => String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
   function renderDocs(){
@@ -1854,7 +1931,9 @@ async function docSave(){
     // agrupar por cliente
     const grupos = new Map();
     DB.docs.forEach(d=>{ const k=d.cli||''; if(!grupos.has(k)) grupos.set(k,[]); grupos.get(k).push(d); });
+    if(ES_PYME && MI_CLIENTE_ID && !grupos.has(MI_CLIENTE_ID)) grupos.set(MI_CLIENTE_ID, []);   // aunque todavía no tenga documentos, puede crear carpetas
     if(DOC_CLI!==null && !grupos.has(DOC_CLI)) DOC_CLI = null;
+    if(DOC_CLI===null) DOC_SUB = null;
     if(DOC_CLI===null && ES_PYME && grupos.size===1 && !q) DOC_CLI = [...grupos.keys()][0];
     $('docs-back').style.display = DOC_CLI===null ? 'none' : 'flex';
     DOC_VISIBLES = [];
@@ -1879,17 +1958,43 @@ async function docSave(){
       return;
     }
 
-    // ── vista de archivos de un cliente ──
-    $('doc-cli-t').textContent = '📁 ' + cliName(DOC_CLI);
-    let lista = (grupos.get(DOC_CLI)||[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)) || (+b.id)-(+a.id));
-    if(q) lista = lista.filter(d=>norm(d.nombre).includes(q)||norm(d.tipo).includes(q));
+    // ── vista de archivos de un cliente (con sus subcarpetas) ──
+    const carps = carpsDe(DOC_CLI);
+    if(DOC_SUB!==null && !carps.some(c=>c.id===DOC_SUB)) DOC_SUB = null;
+    const sub = DOC_SUB!==null ? carps.find(c=>c.id===DOC_SUB) : null;
+    $('doc-cli-t').textContent = '📁 ' + cliName(DOC_CLI) + (sub ? '  ›  ' + sub.nombre : '');
+    $('doc-up').style.display = sub ? '' : 'none';
+    $('doc-up').textContent = ES_PYME ? '← Volver a mi carpeta' : '← ' + cliName(DOC_CLI);
+    $('carp-bar').style.display = PUEDE_CARPETAS ? 'flex' : 'none';
+    $('carp-new').style.display = sub ? 'none' : '';
+    $('carp-ren').style.display = sub ? '' : 'none';
+    $('carp-del').style.display = sub ? '' : 'none';
+    const todos = (grupos.get(DOC_CLI)||[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)) || (+b.id)-(+a.id));
+    // Con búsqueda se mira en todas las carpetas del cliente; sin búsqueda, solo en la carpeta abierta.
+    let lista = q ? todos.filter(d=>norm(d.nombre).includes(q)||norm(d.tipo).includes(q)) : todos.filter(d=>(d.carp||'')===(sub?sub.id:''));
+    let subs = !sub ? carps.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre)) : [];
+    if(q) subs = subs.filter(c=>norm(c.nombre).includes(q));
     DOC_VISIBLES = lista.map(d=>d.id);
-    if(!lista.length){ g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="e">▭</div>Ningún documento coincide con la búsqueda.</div>`; actualizarSelDoc(); return; }
-    g.innerHTML = lista.map(d=>{
+    const cardsSub = subs.map(c=>{ const n=todos.filter(d=>d.carp===c.id).length;
+      return `<div class="doc folder subf" data-subf="${c.id}" tabindex="0" role="button" aria-label="Abrir la carpeta ${esc(c.nombre)}"><span class="cnt">${n}</span><div class="di">📂</div><div class="dt">${esc(c.nombre)}</div><div class="dm">${n} documento${n===1?'':'s'}</div></div>`; }).join('');
+    if(!lista.length && !subs.length){
+      g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="e">▭</div>${q?'Ningún documento ni carpeta coincide con la búsqueda.':(sub?'Esta carpeta está vacía. Cargá documentos con “Carga masiva” o movelos desde la carpeta principal.':'Todavía no hay documentos en esta carpeta.')}</div>`;
+      actualizarSelDoc(); return;
+    }
+    const cardsDoc = lista.map(d=>{
       const ver = d.archivo_mime ? `<button type="button" class="btn btn-soft btn-sm" data-ver-doc="${d.id}">Ver archivo</button>` : `<span class="dm" style="font-style:italic">Sin archivo adjunto</span>`;
       const del = PUEDE_EDITAR ? `<button class="btn btn-soft btn-sm" style="color:var(--red);border-color:var(--red)" data-del-doc="${d.id}">Eliminar</button>` : '';
-      return `<div class="doc" data-doc="${d.id}">${PUEDE_EDITAR?`<label class="doc-sel" title="Seleccionar"><input type="checkbox" data-sel-doc="${d.id}" ${SEL_DOC.has(d.id)?'checked':''}></label>`:''}<div class="di">${ic[d.tipo]||'📁'}</div><div class="dt">${esc(d.nombre)}</div><div class="dm">${esc(d.tipo)}</div><div class="dm">${new Date(d.fecha+'T00:00').toLocaleDateString('es-AR')}</div><div class="doc-acts">${ver}${del}</div></div>`;
+      const mover = (PUEDE_CARPETAS && carps.length) ? `<button type="button" class="btn btn-soft btn-sm" data-mover-doc="${d.id}">Mover</button>` : '';
+      const dnde = (q && d.carp) ? `<div class="en-carp">📂 ${esc((carps.find(c=>c.id===d.carp)||{}).nombre||'')}</div>` : '';
+      return `<div class="doc" data-doc="${d.id}">${PUEDE_EDITAR?`<label class="doc-sel" title="Seleccionar"><input type="checkbox" data-sel-doc="${d.id}" ${SEL_DOC.has(d.id)?'checked':''}></label>`:''}<div class="di">${ic[d.tipo]||'📁'}</div><div class="dt">${esc(d.nombre)}</div><div class="dm">${esc(d.tipo)}</div><div class="dm">${new Date(d.fecha+'T00:00').toLocaleDateString('es-AR')}</div>${dnde}<div class="doc-acts">${ver}${mover}${del}</div></div>`;
     }).join('');
+    g.innerHTML = cardsSub + cardsDoc;
+    g.querySelectorAll('[data-subf]').forEach(el=>{
+      const abrir=()=>{ SEL_DOC.clear(); DOC_SUB=el.dataset.subf; $('doc-q').value=''; renderDocs(); };
+      el.addEventListener('click',abrir);
+      el.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); abrir(); } });
+    });
+    g.querySelectorAll('[data-mover-doc]').forEach(b=>b.addEventListener('click',()=>moverModal(b.dataset.moverDoc)));
     g.querySelectorAll('[data-del-doc]').forEach(b=>b.addEventListener('click',()=>docDel(b.dataset.delDoc)));
     g.querySelectorAll('[data-sel-doc]').forEach(cb=>cb.addEventListener('change',()=>{ if(cb.checked) SEL_DOC.add(cb.dataset.selDoc); else SEL_DOC.delete(cb.dataset.selDoc); actualizarSelDoc(); }));
     actualizarSelDoc();
@@ -2208,13 +2313,20 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   ['dragenter','dragover'].forEach(ev=>$('dm-drop').addEventListener(ev,e=>{ e.preventDefault(); $('dm-drop').classList.add('over'); }));
   ['dragleave','drop'].forEach(ev=>$('dm-drop').addEventListener(ev,e=>{ e.preventDefault(); $('dm-drop').classList.remove('over'); }));
   $('dm-drop').addEventListener('drop',e=>{ if(e.dataTransfer && e.dataTransfer.files) agregarArchivosDM(e.dataTransfer.files); });
-  $('dm-c').addEventListener('change',()=>{ marcarDuplicadosDM(); renderDM(); });
+  $('dm-c').addEventListener('change',()=>{ dmCarpetas(); marcarDuplicadosDM(); renderDM(); });
   $('dm-tipo-all').addEventListener('change',e=>{ if(e.target.value){ DM.files.forEach(x=>x.tipo=e.target.value); renderDM(); e.target.value=''; } });
   $('dm-vaciar').addEventListener('click',()=>{ DM.files=[]; renderDM(); });
   $('dm-ok').addEventListener('click',subirDM);
   $('doc-q').addEventListener('input', renderDocs);
   $('doc-delsel').addEventListener('click', docDelMulti);
   $('doc-all').addEventListener('change',e=>{ DOC_VISIBLES.forEach(id=>{ if(e.target.checked) SEL_DOC.add(id); else SEL_DOC.delete(id); }); document.querySelectorAll('[data-sel-doc]').forEach(cb=>cb.checked=e.target.checked); actualizarSelDoc(); });
+  $('carp-new').addEventListener('click',()=>carpModal());
+  $('carp-ren').addEventListener('click',()=>carpModal(DOC_SUB));
+  $('carp-del').addEventListener('click',carpBorrar);
+  $('carp-ok').addEventListener('click',carpGuardar);
+  $('carp-n').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); carpGuardar(); } });
+  $('mv-ok').addEventListener('click',moverGuardar);
+  $('doc-up').addEventListener('click',()=>{ SEL_DOC.clear(); DOC_SUB=null; $('doc-q').value=''; renderDocs(); });
   $('doc-back').addEventListener('click',()=>{ SEL_DOC.clear(); DOC_CLI=null; $('doc-q').value=''; renderDocs(); });
   $('ai-cli').addEventListener('change', updateAiCliInfo);
   $('docSave').addEventListener('click',docSave);

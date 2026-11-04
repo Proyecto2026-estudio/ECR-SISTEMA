@@ -44,3 +44,11 @@ CREATE TABLE IF NOT EXISTS carpetas (
   UNIQUE KEY uq_carpeta (cliente_id, nombre)
 );
 -- documentos.carpeta_id INT NULL (se agrega solo al iniciar el servidor)
+
+-- Avisos por mail al estudio ya enviados (un vencimiento se avisa una sola vez a los 7 días)
+CREATE TABLE IF NOT EXISTS alertas_enviadas (
+  venc_id    INT NOT NULL,
+  dias       INT NOT NULL,
+  enviado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (venc_id, dias)
+);

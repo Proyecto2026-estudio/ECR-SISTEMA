@@ -9,6 +9,7 @@ const db      = require('./db');
 const { consultarIA } = require('./ia');
 const { leerExtracto } = require('./extractos');
 const { registrarWhatsApp } = require('./whatsapp');
+const alertas = require('./alertas');
 
 const app  = express();
 app.use(express.static(require('path').join(__dirname, '..', 'public'), { index: 'login.html' }));
@@ -97,6 +98,15 @@ function normalizarRol(r) { return ROLES_VALIDOS.includes(r) ? r : 'contador'; }
   } catch (e) {
     if (e.code !== 'ER_DUP_FIELDNAME') console.error('Migración carpeta_id:', e.message);
   }
+  // Registro de avisos por mail ya enviados (para no repetir el mismo vencimiento)
+  try {
+    await db.query(`CREATE TABLE IF NOT EXISTS alertas_enviadas (
+      venc_id INT NOT NULL,
+      dias INT NOT NULL,
+      enviado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (venc_id, dias)
+    )`);
+  } catch (e) { console.error('Migración alertas_enviadas:', e.message); }
   // Mail del cliente para las alertas de vencimientos (opcional; puede haber varios separados por coma)
   try {
     await db.query('ALTER TABLE clientes ADD COLUMN email_alertas VARCHAR(200) NULL');
@@ -551,7 +561,18 @@ app.post('/api/extractos/leer', requireAuth, async (req, res) => {
 
 registrarWhatsApp(app, db);
 
+// Solo el administrador: manda un mail de prueba, o ejecuta ahora el aviso de vencimientos (?prueba=1 para la prueba)
+app.post('/api/alertas/ejecutar', requireAuth, async (req, res) => {
+  try {
+    const u = await usuarioActual(req);
+    if (!u) return sinSesion(res);
+    if (u.rol !== 'admin') return res.status(403).json({ error: 'Solo el administrador puede ejecutar las alertas' });
+    res.json(req.query.prueba ? await alertas.enviarPrueba() : await alertas.enviarAlertas(db));
+  } catch (e) { console.error('POST /api/alertas/ejecutar:', e.message); res.status(500).json({ error: 'No se pudo enviar el mail: ' + e.message }); }
+});
+
 // ── Arrancar servidor ────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`ECR Backend corriendo en puerto ${PORT}`);
+  alertas.iniciar(db);
 });

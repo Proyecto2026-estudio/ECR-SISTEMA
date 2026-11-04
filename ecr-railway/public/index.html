@@ -347,6 +347,20 @@
   tr.is-sel { background: #f6ecd0 !important; }
 
   /* ─── Cartel de confirmación ─── */
+  .modal.alerta { width: 560px; max-width: 94vw; padding: 1.8rem 1.6rem 1.4rem; }
+  .al-top { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 1rem; }
+  .al-ic { width: 52px; height: 52px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; background: #fdf1d3; border: 3px solid #e6b94c; }
+  .al-top h3 { font-size: 1.3rem; margin: 0; }
+  .al-top p { margin: 0.15rem 0 0; color: var(--ink-2); font-size: 0.92rem; }
+  .al-list { max-height: 46vh; overflow-y: auto; border: 1.5px solid var(--line); border-radius: 10px; }
+  .al-it { display: flex; align-items: center; gap: 0.8rem; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--line-soft); }
+  .al-it:last-child { border-bottom: none; }
+  .al-d { flex: none; min-width: 5.6rem; text-align: center; padding: 0.35rem 0.5rem; border-radius: 8px; font-weight: 700; font-size: 0.82rem; background: #fdf1d3; color: #8a5a00; }
+  .al-d.u { background: #fbe0e0; color: #b42318; }
+  .al-t { flex: 1; min-width: 0; }
+  .al-t b { display: block; font-size: 0.95rem; }
+  .al-t span { color: var(--ink-2); font-size: 0.82rem; }
+  .al-btns { display: flex; justify-content: flex-end; margin-top: 1.1rem; }
   .modal.confirm { width: 440px; padding: 2rem 1.8rem 1.6rem; text-align: center; }
   .conf-ic { width: 68px; height: 68px; border-radius: 50%; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 700; background: var(--red-soft); color: var(--red); border: 3px solid #e08f8f; }
   .conf-ic.info { background: var(--blue-soft); color: var(--blue); border-color: #8fb3e6; }
@@ -875,6 +889,13 @@
     <div class="fld" style="margin-bottom:0"><label>Vista previa</label><div class="prev" id="lo-prev"></div></div>
   </div>
   <div class="mf"><span class="sum" id="lo-sum"></span><button class="btn btn-soft" data-close="m-lote">Cancelar</button><button class="btn btn-pri" id="lo-ok">Crear vencimientos</button></div>
+</div></div>
+
+<!-- ALERTA DE VENCIMIENTOS (administradores y contadores, al ingresar) -->
+<div class="ov" id="m-alerta"><div class="modal alerta" role="alertdialog" aria-labelledby="al-t">
+  <div class="al-top"><div class="al-ic">⏰</div><div><h3 id="al-t">Vencimientos por vencer</h3><p id="al-sub"></p></div></div>
+  <div class="al-list" id="al-list"></div>
+  <div class="al-btns"><button class="btn btn-soft btn-lg" id="al-cerrar">Cerrar</button></div>
 </div></div>
 
 <!-- MODAL CARGA MASIVA -->
@@ -2529,7 +2550,47 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   initUserMenu();
   // ── INIT ──
   aplicarPermisosUI();
-  (async()=>{ await loadAll(); renderAll(); })();
+  // ── ALERTA DE VENCIMIENTOS al ingresar (solo administradores y contadores) ──
+  // Aparece cuando faltan 7, 6, 5, 4, 3, 2, 1 días (o vence hoy), y se puede cerrar; vuelve a aparecer al día siguiente.
+  const DIAS_ALERTA = 7;
+  const claveAlerta = () => 'ecr_alerta_' + isoLocal(new Date());
+  function gruposPorVencer(){
+    const g = new Map();
+    DB.venc.forEach(v=>{
+      if(v.estado==='Cumplido') return;
+      const d = dleft(v.fecha);
+      if(d<0 || d>DIAS_ALERTA) return;
+      const k = v.desc+'|'+v.fecha;
+      if(!g.has(k)) g.set(k,{ desc:v.desc, tipo:v.tipo, fecha:v.fecha, dias:d, items:[] });
+      g.get(k).items.push(v);
+    });
+    return [...g.values()].sort((a,b)=>a.dias-b.dias || a.desc.localeCompare(b.desc,'es'));
+  }
+  const txtDias = d => d===0 ? 'Vence hoy' : d===1 ? 'Vence mañana' : `Vence en ${d} días`;
+  function mostrarAlerta(){
+    if(!(ROL==='admin' || ROL==='contador')) return;
+    try{ if(sessionStorage.getItem(claveAlerta())) return; }catch(e){}
+    const gs = gruposPorVencer();
+    if(!gs.length) return;
+    const total = gs.reduce((n,g)=>n+g.items.length,0);
+    $('al-sub').textContent = gs.length===1 ? txtDias(gs[0].dias)+' · '+fechaCorta(gs[0].fecha) : `${gs.length} vencimientos en los próximos ${DIAS_ALERTA} días`;
+    $('al-list').innerHTML = gs.map((g,i)=>{
+      const cl = g.items.length===1 ? cliName(g.items[0].cli) : `${g.items.length} clientes`;
+      return `<div class="al-it"><div class="al-d ${g.dias<=2?'u':''}">${txtDias(g.dias)}</div><div class="al-t"><b>${esc(g.desc)}</b><span>${esc(cl)} · ${fechaCorta(g.fecha)}</span></div><button class="btn btn-pri btn-sm" data-al="${i}">Ver vencimiento</button></div>`;
+    }).join('');
+    $('al-list').querySelectorAll('[data-al]').forEach(b=>b.addEventListener('click',()=>{
+      const g = gs[+b.dataset.al];
+      try{ sessionStorage.setItem(claveAlerta(),'1'); }catch(e){}
+      closeM('m-alerta');
+      nav('agenda');
+      if(g.items.length===1){ venModal(g.items[0].id); }
+      else { setAgenda('list'); FVEN.desc=new Set([g.desc]); FVEN.fMin=g.fecha; FVEN.fMax=g.fecha; renderVen(); }
+    }));
+    openM('m-alerta');
+  }
+  $('al-cerrar').addEventListener('click',()=>{ try{ sessionStorage.setItem(claveAlerta(),'1'); }catch(e){} closeM('m-alerta'); });
+  $('m-alerta').addEventListener('click',e=>{ if(e.target===$('m-alerta')) try{ sessionStorage.setItem(claveAlerta(),'1'); }catch(err){} });
+  (async()=>{ await loadAll(); renderAll(); mostrarAlerta(); })();
   try{ const k=GKEY(); if(k && $('cfg-key')) $('cfg-key').value=k; }catch(e){}
   refreshKeyStatus();
   loadTicker();

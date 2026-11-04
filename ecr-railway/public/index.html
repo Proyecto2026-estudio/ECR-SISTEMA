@@ -649,8 +649,13 @@
             <div class="cg" id="cal-g"></div>
           </div>
         </div>
-        <div id="ag-list" style="display:none"><div class="panel"><table>
-          <thead><tr><th class="selc"><input type="checkbox" id="ven-all" title="Seleccionar todos"></th><th>Vencimiento</th><th>Cliente</th><th>Tipo</th><th>Fecha</th><th>Estado</th><th></th></tr></thead>
+        <div id="ag-list" style="display:none"><div class="fbar" id="ven-fbar"></div><div class="panel"><table>
+          <thead><tr><th class="selc"><input type="checkbox" id="ven-all" title="Seleccionar todos"></th>
+            <th><span class="th-in">Vencimiento <button class="fbtn" data-fcol="desc" title="Filtrar y ordenar">▾</button></span></th>
+            <th><span class="th-in">Cliente <button class="fbtn" data-fcol="cli" title="Filtrar y ordenar">▾</button></span></th>
+            <th><span class="th-in">Tipo <button class="fbtn" data-fcol="tipo" title="Filtrar y ordenar">▾</button></span></th>
+            <th><span class="th-in">Fecha <button class="fbtn" data-fcol="fecha" title="Filtrar por fechas y ordenar">▾</button></span></th>
+            <th><span class="th-in">Estado <button class="fbtn" data-fcol="estado" title="Filtrar y ordenar">▾</button></span></th><th></th></tr></thead>
           <tbody id="t-ven"></tbody>
         </table></div></div>
       </section>
@@ -1295,7 +1300,7 @@
   }
   function renderFbar(){
     const bar=$('cli-fbar'); if(!bar) return;
-    document.querySelectorAll('.fbtn').forEach(b=>{
+    document.querySelectorAll('#v-clientes .fbtn').forEach(b=>{
       const c=b.dataset.fcol;
       b.classList.toggle('on', c==='honorarios' ? (FCLI.honMin!=null||FCLI.honMax!=null) : !!FCLI[c] || SORT_CLI.col===c);
     });
@@ -1308,24 +1313,27 @@
     const fc=$('fclear'); if(fc) fc.addEventListener('click',limpiarFiltrosCli);
   }
   function limpiarFiltrosCli(){ FCLI.nombre=FCLI.cuit=FCLI.servicio=FCLI.estado=null; FCLI.honMin=FCLI.honMax=null; SORT_CLI.col=null; renderCli(); }
+  // Cada tabla con filtros tiene su "contexto" (datos, filtros activos, cómo mostrar los valores y cómo redibujarse).
+  const CTX_CLI = { id:'cli', F:FCLI, SORT:SORT_CLI, items:()=>DB.clientes, valor:valorCol, etiqueta:etiquetaVal, render:()=>renderCli(),
+    rango:{ col:'honorarios', min:'honMin', max:'honMax', tipo:'number', rot:['Desde ($)','Hasta ($)'], orden:[['1','↑ Menor a mayor'],['-1','↓ Mayor a menor']] } };
   let fpopCol = null;
   function cerrarFpop(){ $('fpop').classList.remove('open'); fpopCol=null; }
-  function abrirFpop(col, btn){
-    if(fpopCol===col){ cerrarFpop(); return; }
-    fpopCol=col;
-    const pop=$('fpop');
-    const sortBtns = col==='honorarios'
-      ? [['1','↑ Menor a mayor'],['-1','↓ Mayor a menor']]
-      : [['1','↑ Ordenar A → Z'],['-1','↓ Ordenar Z → A']];
-    let html = `<div class="fp-sec fp-sort">${sortBtns.map(([d,t])=>`<button data-fsort="${d}" class="${SORT_CLI.col===col&&String(SORT_CLI.dir)===d?'on':''}">${t}</button>`).join('')}</div>`;
-    if(col==='honorarios'){
-      html += `<div class="fp-sec"><div class="fp-two"><div><label style="font-size:0.78rem;font-weight:600">Desde ($)</label><input type="number" id="fp-min" min="0" value="${FCLI.honMin!=null?FCLI.honMin:''}"></div><div><label style="font-size:0.78rem;font-weight:600">Hasta ($)</label><input type="number" id="fp-max" min="0" value="${FCLI.honMax!=null?FCLI.honMax:''}"></div></div></div>`;
+  function abrirFpop(col, btn, ctx){
+    ctx = ctx || CTX_CLI;
+    const F=ctx.F, SORT=ctx.SORT, R=ctx.rango, key=ctx.id+':'+col;
+    if(fpopCol===key){ cerrarFpop(); return; }
+    fpopCol=key;
+    const pop=$('fpop'), esRango = col===R.col;
+    const sortBtns = esRango ? R.orden : [['1','↑ Ordenar A → Z'],['-1','↓ Ordenar Z → A']];
+    let html = `<div class="fp-sec fp-sort">${sortBtns.map(([d,t])=>`<button data-fsort="${d}" class="${SORT.col===col&&String(SORT.dir)===d?'on':''}">${t}</button>`).join('')}</div>`;
+    if(esRango){
+      html += `<div class="fp-sec"><div class="fp-two"><div><label style="font-size:0.78rem;font-weight:600">${R.rot[0]}</label><input type="${R.tipo}" id="fp-min" ${R.tipo==='number'?'min="0"':''} value="${F[R.min]!=null?F[R.min]:''}"></div><div><label style="font-size:0.78rem;font-weight:600">${R.rot[1]}</label><input type="${R.tipo}" id="fp-max" ${R.tipo==='number'?'min="0"':''} value="${F[R.max]!=null?F[R.max]:''}"></div></div></div>`;
     } else {
-      const cnt={}; DB.clientes.forEach(c=>{ const v=valorCol(c,col); cnt[v]=(cnt[v]||0)+1; });
-      const vals=Object.keys(cnt).sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
-      const sel = FCLI[col] || new Set(vals);
+      const cnt={}; ctx.items().forEach(c=>{ const v=ctx.valor(c,col); cnt[v]=(cnt[v]||0)+1; });
+      const vals=Object.keys(cnt).sort((a,b)=> ctx.orden && ctx.orden[col] ? ctx.orden[col](a,b) : a.localeCompare(b,'es',{numeric:true}));
+      const sel = F[col] || new Set(vals);
       html += `<div class="fp-sec"><input type="search" id="fp-q" placeholder="Buscar…" autocomplete="off"></div>
-        <div class="fp-list" id="fp-list"><label class="fp-all"><input type="checkbox" id="fp-all"> (Seleccionar todo)</label>${vals.map(v=>`<label data-v="${esc(v)}" data-t="${esc(etiquetaVal(col,v).toLowerCase())}"><input type="checkbox" data-fv="${esc(v)}" ${sel.has(v)?'checked':''}> ${esc(etiquetaVal(col,v))}<span class="n">${cnt[v]}</span></label>`).join('')}</div>`;
+        <div class="fp-list" id="fp-list"><label class="fp-all"><input type="checkbox" id="fp-all"> (Seleccionar todo)</label>${vals.map(v=>`<label data-v="${esc(v)}" data-t="${esc(ctx.etiqueta(col,v).toLowerCase())}"><input type="checkbox" data-fv="${esc(v)}" ${sel.has(v)?'checked':''}> ${esc(ctx.etiqueta(col,v))}<span class="n">${cnt[v]}</span></label>`).join('')}</div>`;
     }
     html += `<div class="fp-foot"><button class="btn btn-soft btn-sm" id="fp-clear">Quitar filtro</button><button class="btn btn-pri btn-sm" id="fp-ok">Aceptar</button></div>`;
     pop.innerHTML = html;
@@ -1333,8 +1341,8 @@
     pop.style.left = Math.max(8, Math.min(window.innerWidth-296, r.left-10))+'px';
     pop.style.top = (r.bottom+6)+'px';
     pop.classList.add('open');
-    pop.querySelectorAll('[data-fsort]').forEach(b=>b.addEventListener('click',()=>{ SORT_CLI.col=col; SORT_CLI.dir=+b.dataset.fsort; cerrarFpop(); renderCli(); }));
-    if(col!=='honorarios'){
+    pop.querySelectorAll('[data-fsort]').forEach(b=>b.addEventListener('click',()=>{ SORT.col=col; SORT.dir=+b.dataset.fsort; cerrarFpop(); ctx.render(); }));
+    if(!esRango){
       const all=$('fp-all'), items=()=>[...pop.querySelectorAll('[data-fv]')];
       const vis=()=>items().filter(i=>i.closest('label').style.display!=='none');
       const sync=()=>{ const v=vis(), m=v.filter(i=>i.checked).length; all.checked=v.length>0&&m===v.length; all.indeterminate=m>0&&m<v.length; };
@@ -1345,17 +1353,17 @@
       $('fp-ok').addEventListener('click',()=>{
         const base = $('fp-q').value.trim() ? vis() : items();   // con texto en la búsqueda, filtra solo por lo que coincide (como Excel)
         const marc=base.filter(i=>i.checked).map(i=>i.dataset.fv);
-        FCLI[col] = marc.length===items().length ? null : new Set(marc);
-        cerrarFpop(); renderCli();
+        F[col] = marc.length===items().length ? null : new Set(marc);
+        cerrarFpop(); ctx.render();
       });
-      $('fp-clear').addEventListener('click',()=>{ FCLI[col]=null; if(SORT_CLI.col===col) SORT_CLI.col=null; cerrarFpop(); renderCli(); });
+      $('fp-clear').addEventListener('click',()=>{ F[col]=null; if(SORT.col===col) SORT.col=null; cerrarFpop(); ctx.render(); });
       setTimeout(()=>{ try{ $('fp-q').focus(); }catch(e){} },30);
     } else {
-      $('fp-ok').addEventListener('click',()=>{ const a=$('fp-min').value, b=$('fp-max').value; FCLI.honMin=a===''?null:+a; FCLI.honMax=b===''?null:+b; cerrarFpop(); renderCli(); });
-      $('fp-clear').addEventListener('click',()=>{ FCLI.honMin=FCLI.honMax=null; if(SORT_CLI.col===col) SORT_CLI.col=null; cerrarFpop(); renderCli(); });
+      $('fp-ok').addEventListener('click',()=>{ const a=$('fp-min').value, b=$('fp-max').value; F[R.min]=a===''?null:(R.tipo==='number'?+a:a); F[R.max]=b===''?null:(R.tipo==='number'?+b:b); cerrarFpop(); ctx.render(); });
+      $('fp-clear').addEventListener('click',()=>{ F[R.min]=F[R.max]=null; if(SORT.col===col) SORT.col=null; cerrarFpop(); ctx.render(); });
     }
   }
-  document.querySelectorAll('.fbtn').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); abrirFpop(b.dataset.fcol,b); }));
+  document.querySelectorAll('#v-clientes .fbtn').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); abrirFpop(b.dataset.fcol,b,CTX_CLI); }));
   document.addEventListener('click',e=>{ if(fpopCol && !e.target.closest('#fpop')) cerrarFpop(); });
   document.addEventListener('keydown',e=>{ if(e.key==='Escape') cerrarFpop(); });
   window.addEventListener('resize',cerrarFpop);
@@ -1433,9 +1441,51 @@
     SEL_VEN.clear(); await loadAll(); renderAll();
     toast(fallos?`No se pudieron eliminar ${fallos} vencimiento(s)`:(ids.length===1?'Vencimiento eliminado':`${ids.length} vencimientos eliminados`));
   }
+  // ── FILTROS TIPO EXCEL (Agenda · vista Lista) ──
+  const FVEN = { desc:null, cli:null, tipo:null, estado:null, fMin:null, fMax:null };
+  const SORT_VEN = { col:null, dir:1 };
+  const VCOL_LABEL = { desc:'Vencimiento', cli:'Cliente', tipo:'Tipo', fecha:'Fecha', estado:'Estado' };
+  const ESTADOS_VEN = ['Vencido','Próximos 7 días','Más adelante','Cumplido'];
+  function estadoVen(v){ if(v.estado==='Cumplido') return 'Cumplido'; const d=dleft(v.fecha); return d<0 ? 'Vencido' : (d<=7 ? 'Próximos 7 días' : 'Más adelante'); }
+  function valorVen(v,col){ return col==='cli' ? cliName(v.cli) : (col==='estado' ? estadoVen(v) : String(v[col]==null?'':v[col])); }
+  const fechaCorta = f => f ? new Date(f+'T00:00').toLocaleDateString('es-AR') : '';
+  const CTX_VEN = { id:'ven', F:FVEN, SORT:SORT_VEN, items:()=>DB.venc, valor:valorVen, etiqueta:(c,v)=>v, render:()=>renderVen(),
+    orden:{ estado:(a,b)=>ESTADOS_VEN.indexOf(a)-ESTADOS_VEN.indexOf(b) },
+    rango:{ col:'fecha', min:'fMin', max:'fMax', tipo:'date', rot:['Desde','Hasta'], orden:[['1','↑ Más antiguos primero'],['-1','↓ Más recientes primero']] } };
+  function vencimientosFiltrados(){
+    let l = DB.venc.filter(v=>{
+      for(const col of ['desc','cli','tipo','estado']) if(FVEN[col] && !FVEN[col].has(valorVen(v,col))) return false;
+      if(FVEN.fMin && v.fecha<FVEN.fMin) return false;
+      if(FVEN.fMax && v.fecha>FVEN.fMax) return false;
+      return true;
+    });
+    const col=SORT_VEN.col, d=SORT_VEN.dir;
+    if(!col || col==='fecha') return [...l].sort((a,b)=>(col?d:1)*(new Date(a.fecha)-new Date(b.fecha)));
+    return [...l].sort((a,b)=> d*(col==='estado' ? ESTADOS_VEN.indexOf(valorVen(a,col))-ESTADOS_VEN.indexOf(valorVen(b,col)) : valorVen(a,col).localeCompare(valorVen(b,col),'es',{numeric:true})) || (new Date(a.fecha)-new Date(b.fecha)));
+  }
+  function limpiarFiltrosVen(){ FVEN.desc=FVEN.cli=FVEN.tipo=FVEN.estado=null; FVEN.fMin=FVEN.fMax=null; SORT_VEN.col=null; renderVen(); }
+  function renderFbarVen(){
+    const bar=$('ven-fbar'); if(!bar) return;
+    document.querySelectorAll('#v-agenda .fbtn').forEach(b=>{
+      const c=b.dataset.fcol;
+      b.classList.toggle('on', c==='fecha' ? (!!FVEN.fMin||!!FVEN.fMax||SORT_VEN.col==='fecha') : (!!FVEN[c] || SORT_VEN.col===c));
+    });
+    const chips=[];
+    ['desc','cli','tipo','estado'].forEach(c=>{ if(FVEN[c]){ const v=[...FVEN[c]]; chips.push(`<span class="fchip">${VCOL_LABEL[c]}: ${esc(v.length>2? v.length+' seleccionados' : v.join(', '))}<button data-fquit="${c}" aria-label="Quitar filtro">×</button></span>`); } });
+    if(FVEN.fMin||FVEN.fMax) chips.push(`<span class="fchip">Fecha: ${FVEN.fMin?'desde '+fechaCorta(FVEN.fMin):''} ${FVEN.fMax?'hasta '+fechaCorta(FVEN.fMax):''}<button data-fquit="fecha" aria-label="Quitar filtro">×</button></span>`);
+    const total=DB.venc.length, n=vencimientosFiltrados().length;
+    bar.innerHTML = (chips.length||SORT_VEN.col) ? `<b>Mostrando ${n} de ${total}</b>${chips.join('')}<button class="btn btn-soft btn-sm" id="vclear">Quitar todos los filtros</button>` : '';
+    bar.querySelectorAll('[data-fquit]').forEach(b=>b.addEventListener('click',()=>{ const c=b.dataset.fquit; if(c==='fecha'){FVEN.fMin=null;FVEN.fMax=null;} else FVEN[c]=null; renderVen(); }));
+    const vc=$('vclear'); if(vc) vc.addEventListener('click',limpiarFiltrosVen);
+  }
+  document.querySelectorAll('#v-agenda .fbtn').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); abrirFpop(b.dataset.fcol,b,CTX_VEN); }));
+
   function renderVen(){
     const t=$('t-ven');
-    const s=[...DB.venc].sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+    const s=vencimientosFiltrados();
+    [...SEL_VEN].forEach(id=>{ if(!s.some(v=>v.id===id)) SEL_VEN.delete(id); });   // nunca queda marcado algo que el filtro oculta
+    renderFbarVen();
+    if(DB.venc.length && !s.length){ t.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="e">▦</div>Ningún vencimiento coincide con los filtros. <button class="btn btn-soft btn-sm" id="vclear2" style="margin-left:0.6rem">Quitar filtros</button></div></td></tr>`; $('vclear2').addEventListener('click',limpiarFiltrosVen); actualizarSelVen(); return; }
     if(!s.length){ t.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="e">▦</div>Sin vencimientos cargados.</div></td></tr>`; actualizarSelVen(); return; }
     t.innerHTML = s.map(v=>{
       const d=dleft(v.fecha); let c;

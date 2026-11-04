@@ -2,9 +2,13 @@
 //  Aviso por mail AL ESTUDIO cuando un vencimiento vence en 7 días.
 //  - Corre una vez al día (a partir de las 8:00, hora de Argentina).
 //  - Un mismo vencimiento se avisa una sola vez (tabla alertas_enviadas).
-//  - Se envía desde una casilla de Gmail (contraseña de aplicación) o, si no hay, con Resend.
+//  - Se envía desde Gmail por medio de un Google Apps Script (puente por HTTPS, porque Railway
+//    bloquea los puertos SMTP), o por SMTP/Resend si estuvieran configurados.
 //    Variables de entorno:
 //      ALERTAS_MAIL_PARA    mail del estudio que recibe el aviso (admite varios, separados por coma)
+//      ALERTAS_WEBHOOK_URL     dirección del Apps Script publicado (aplicación web)
+//      ALERTAS_WEBHOOK_SECRET  clave compartida con el script
+//      (alternativa SMTP, no funciona en el plan Hobby de Railway)
 //      GMAIL_USER           casilla de Gmail desde la que se envía
 //      GMAIL_APP_PASSWORD   contraseña de aplicación de esa casilla (16 letras)
 //      (alternativa) RESEND_API_KEY y, opcional, ALERTAS_MAIL_DE
@@ -26,14 +30,27 @@ function sumarDias(iso, n) {
 }
 const fechaAR = iso => iso.split('-').reverse().join('/');
 
+const usaWebhook = () => !!(process.env.ALERTAS_WEBHOOK_URL && process.env.ALERTAS_WEBHOOK_SECRET);
 const usaGmail = () => !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
 function configurado() {
-  return !!(process.env.ALERTAS_MAIL_PARA && (usaGmail() || process.env.RESEND_API_KEY));
+  return !!(process.env.ALERTAS_MAIL_PARA && (usaWebhook() || usaGmail() || process.env.RESEND_API_KEY));
 }
-const FALTA = 'Faltan variables en el servidor: ALERTAS_MAIL_PARA y GMAIL_USER + GMAIL_APP_PASSWORD';
+const FALTA = 'Faltan variables en el servidor: ALERTAS_MAIL_PARA, ALERTAS_WEBHOOK_URL y ALERTAS_WEBHOOK_SECRET';
 
 async function enviarMail({ asunto, html, texto }) {
   const para = process.env.ALERTAS_MAIL_PARA.split(/[,;\s]+/).filter(Boolean);
+  if (usaWebhook()) {
+    const r = await fetch(process.env.ALERTAS_WEBHOOK_URL, {
+      method: 'POST', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },     // Apps Script recibe el JSON como texto
+      body: JSON.stringify({ secret: process.env.ALERTAS_WEBHOOK_SECRET, to: para.join(','), subject: asunto, html, text: texto }),
+      signal: AbortSignal.timeout(25000)
+    });
+    const t = await r.text();
+    let j = null; try { j = JSON.parse(t); } catch (e) {}
+    if (!r.ok || !j || !j.ok) throw new Error('Gmail (Apps Script): ' + ((j && j.error) || (t.includes('<html') ? 'la respuesta no es del script; revisá que esté publicado para "Cualquier persona"' : t.slice(0, 150)) || r.status));
+    return;
+  }
   if (usaGmail()) {
     const nodemailer = require('nodemailer');
     const t = nodemailer.createTransport({

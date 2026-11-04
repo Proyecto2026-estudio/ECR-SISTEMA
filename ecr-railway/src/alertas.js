@@ -2,10 +2,12 @@
 //  Aviso por mail AL ESTUDIO cuando un vencimiento vence en 7 días.
 //  - Corre una vez al día (a partir de las 8:00, hora de Argentina).
 //  - Un mismo vencimiento se avisa una sola vez (tabla alertas_enviadas).
-//  - Envía con Resend (https://resend.com) usando variables de entorno:
-//      RESEND_API_KEY      clave de la API
-//      ALERTAS_MAIL_PARA   mail del estudio que recibe el aviso (admite varios, separados por coma)
-//      ALERTAS_MAIL_DE     remitente (opcional; por defecto onboarding@resend.dev)
+//  - Se envía desde una casilla de Gmail (contraseña de aplicación) o, si no hay, con Resend.
+//    Variables de entorno:
+//      ALERTAS_MAIL_PARA    mail del estudio que recibe el aviso (admite varios, separados por coma)
+//      GMAIL_USER           casilla de Gmail desde la que se envía
+//      GMAIL_APP_PASSWORD   contraseña de aplicación de esa casilla (16 letras)
+//      (alternativa) RESEND_API_KEY y, opcional, ALERTAS_MAIL_DE
 // ============================================================
 const DIAS_AVISO = 7;
 const TZ = 'America/Argentina/Buenos_Aires';
@@ -24,12 +26,24 @@ function sumarDias(iso, n) {
 }
 const fechaAR = iso => iso.split('-').reverse().join('/');
 
+const usaGmail = () => !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
 function configurado() {
-  return !!(process.env.RESEND_API_KEY && process.env.ALERTAS_MAIL_PARA);
+  return !!(process.env.ALERTAS_MAIL_PARA && (usaGmail() || process.env.RESEND_API_KEY));
 }
+const FALTA = 'Faltan variables en el servidor: ALERTAS_MAIL_PARA y GMAIL_USER + GMAIL_APP_PASSWORD';
 
 async function enviarMail({ asunto, html, texto }) {
   const para = process.env.ALERTAS_MAIL_PARA.split(/[,;\s]+/).filter(Boolean);
+  if (usaGmail()) {
+    const nodemailer = require('nodemailer');
+    const t = nodemailer.createTransport({
+      host: 'smtp.gmail.com', port: 465, secure: true,
+      auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD.replace(/\s+/g, '') },
+      connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 20000
+    });
+    await t.sendMail({ from: `"Sistema ECR" <${process.env.GMAIL_USER}>`, to: para.join(', '), subject: asunto, text: texto, html });
+    return;
+  }
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + process.env.RESEND_API_KEY },
@@ -68,7 +82,7 @@ function armarMail(filas, fechaVence) {
 
 // Busca los vencimientos que vencen dentro de 7 días y todavía no se avisaron; manda UN mail con todos.
 async function enviarAlertas(db) {
-  if (!configurado()) return { enviado: false, motivo: 'Faltan RESEND_API_KEY y/o ALERTAS_MAIL_PARA en las variables del servidor' };
+  if (!configurado()) return { enviado: false, motivo: FALTA };
   const objetivo = sumarDias(ahoraAR().fecha, DIAS_AVISO);
   const [filas] = await db.query(
     `SELECT v.id, v.descripcion, v.tipo, c.nombre AS cliente_nombre
@@ -84,7 +98,7 @@ async function enviarAlertas(db) {
 }
 
 async function enviarPrueba() {
-  if (!configurado()) return { enviado: false, motivo: 'Faltan RESEND_API_KEY y/o ALERTAS_MAIL_PARA en las variables del servidor' };
+  if (!configurado()) return { enviado: false, motivo: FALTA };
   await enviarMail({
     asunto: 'Prueba de alertas · Sistema ECR',
     texto: 'Este es un mail de prueba. Si lo recibiste, las alertas de vencimientos están bien configuradas.',
@@ -102,7 +116,7 @@ async function tarea(db) {
 }
 
 function iniciar(db) {
-  if (!configurado()) console.log('Alertas por mail: desactivadas (faltan RESEND_API_KEY y ALERTAS_MAIL_PARA)');
+  if (!configurado()) console.log('Alertas por mail: desactivadas (' + FALTA + ')');
   setTimeout(() => tarea(db), 60 * 1000);
   setInterval(() => tarea(db), 30 * 60 * 1000);
 }

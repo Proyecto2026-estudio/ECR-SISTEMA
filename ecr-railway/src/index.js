@@ -241,9 +241,21 @@ app.post('/api/recuperar', async (req, res) => {
 // ══════════════════════════════════════════════════════════
 //  CLIENTES
 // ══════════════════════════════════════════════════════════
+// Los honorarios son datos del administrador: cualquier otro rol (o sin sesión) no los recibe ni los modifica.
+async function esAdminReq(req) {
+  try {
+    const auth = req.headers.authorization || '';
+    const p = auth.startsWith('Bearer ') ? verifyToken(auth.slice(7)) : null;
+    if (!p) return false;
+    const [us] = await db.query('SELECT rol FROM usuarios WHERE id = ?', [p.id]);
+    return !!us[0] && us[0].rol === 'admin';
+  } catch (e) { return false; }
+}
+
 app.get('/api/clientes', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM clientes ORDER BY id DESC');
+    if (!(await esAdminReq(req))) rows.forEach(r => { delete r.honorarios; });
     res.json(rows);
   } catch (e) { res.status(500).json({ error: 'Error de base de datos' }); }
 });
@@ -265,9 +277,10 @@ app.post('/api/clientes', async (req, res) => {
   const m = limpiarMails(email_alertas);
   if (m.error) return res.status(400).json({ error: m.error });
   try {
+    const hon = (await esAdminReq(req)) ? (honorarios||0) : 0;
     const [r] = await db.query(
       'INSERT INTO clientes (nombre,cuit,servicio,honorarios,estado,email_alertas) VALUES (?,?,?,?,?,?)',
-      [nombre, cuit||null, servicio||'Asesoramiento integral', honorarios||0, estado||'Activo', m.valor]
+      [nombre, cuit||null, servicio||'Asesoramiento integral', hon, estado||'Activo', m.valor]
     );
     res.status(201).json({ ok: true, id: r.insertId });
   } catch (e) { res.status(500).json({ error: 'Error al guardar' }); }
@@ -278,10 +291,17 @@ app.put('/api/clientes/:id', async (req, res) => {
   const m = limpiarMails(email_alertas);
   if (m.error) return res.status(400).json({ error: m.error });
   try {
-    await db.query(
-      'UPDATE clientes SET nombre=?,cuit=?,servicio=?,honorarios=?,estado=?,email_alertas=? WHERE id=?',
-      [nombre, cuit||null, servicio||'Asesoramiento integral', honorarios||0, estado||'Activo', m.valor, req.params.id]
-    );
+    if (await esAdminReq(req)) {
+      await db.query(
+        'UPDATE clientes SET nombre=?,cuit=?,servicio=?,honorarios=?,estado=?,email_alertas=? WHERE id=?',
+        [nombre, cuit||null, servicio||'Asesoramiento integral', honorarios||0, estado||'Activo', m.valor, req.params.id]
+      );
+    } else {   // sin ser admin se conserva el honorario que ya tenía
+      await db.query(
+        'UPDATE clientes SET nombre=?,cuit=?,servicio=?,estado=?,email_alertas=? WHERE id=?',
+        [nombre, cuit||null, servicio||'Asesoramiento integral', estado||'Activo', m.valor, req.params.id]
+      );
+    }
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: 'Error al actualizar' }); }
 });

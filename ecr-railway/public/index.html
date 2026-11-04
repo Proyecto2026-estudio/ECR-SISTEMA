@@ -554,6 +554,7 @@
   .dm-bar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .2s; }
   @media (max-width: 700px) { .dm-row { grid-template-columns: 26px 1fr 30px; } .dm-row select, .dm-row .sz { grid-column: 2; text-align: left; } }
 
+  body.no-hon .hon { display:none !important; }
   /* ─── CELULAR: menú lateral como cajón + ajustes de pantalla chica ─── */
   .burger { display:none; flex-shrink:0; width:44px; height:44px; border:1.5px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); font-size:1.4rem; line-height:1; cursor:pointer; align-items:center; justify-content:center; }
   .side-bg { display:none; }
@@ -681,7 +682,7 @@
           <div class="metric" style="--accentc:var(--gold)"><div class="lbl">Clientes activos</div><div class="num" id="s-cli">0</div><div class="tr up">Cartera del estudio</div></div>
           <div class="metric" style="--accentc:var(--amber)"><div class="lbl">Vencen en 7 días</div><div class="num" id="s-ven">0</div><div class="tr dn" id="s-ven-t">A controlar</div></div>
           <div class="metric" style="--accentc:var(--blue)"><div class="lbl">Documentos</div><div class="num" id="s-doc">0</div><div class="tr">En el archivo</div></div>
-          <div class="metric" style="--accentc:var(--green)"><div class="lbl">Honorarios / mes</div><div class="num" id="s-hon" style="font-size:1.5rem">$0</div><div class="tr up">Facturación est.</div></div>
+          <div class="metric hon" style="--accentc:var(--green)"><div class="lbl">Honorarios / mes</div><div class="num" id="s-hon" style="font-size:1.5rem">$0</div><div class="tr up">Facturación est.</div></div>
         </div>
         <div class="g2">
           <div class="panel">
@@ -707,7 +708,7 @@
             <th><span class="th-in">Empresa <button class="fbtn" data-fcol="nombre" title="Filtrar y ordenar">▾</button></span></th>
             <th><span class="th-in">CUIT <button class="fbtn" data-fcol="cuit" title="Filtrar por terminación del CUIT">▾</button></span></th>
             <th><span class="th-in">Servicio <button class="fbtn" data-fcol="servicio" title="Filtrar y ordenar">▾</button></span></th>
-            <th><span class="th-in">Honorarios <button class="fbtn" data-fcol="honorarios" title="Filtrar y ordenar">▾</button></span></th>
+            <th class="hon"><span class="th-in">Honorarios <button class="fbtn" data-fcol="honorarios" title="Filtrar y ordenar">▾</button></span></th>
             <th><span class="th-in">Estado <button class="fbtn" data-fcol="estado" title="Filtrar y ordenar">▾</button></span></th>
             <th>Mail de alertas</th><th></th></tr></thead>
           <tbody id="t-cli"></tbody>
@@ -892,7 +893,7 @@
     <div class="fld"><label>Razón social / Empresa</label><input id="ci-n" placeholder="Distribuidora del Oeste S.A."></div>
     <div class="frow">
       <div class="fld"><label>CUIT</label><input id="ci-c" placeholder="30-12345678-9" maxlength="13" inputmode="numeric"></div>
-      <div class="fld"><label>Honorarios ($/mes)</label><input id="ci-h" type="number" placeholder="45000"></div>
+      <div class="fld hon"><label>Honorarios ($/mes)</label><input id="ci-h" type="number" placeholder="45000"></div>
     </div>
     <div class="fld"><label>Mail para las alertas de vencimientos</label><input id="ci-m" type="text" placeholder="cliente@empresa.com (podés poner varios separados por coma)" inputmode="email" autocomplete="off"><div style="font-size:0.78rem;color:var(--ink-3);margin-top:0.25rem">Se usa solo para avisar los vencimientos de este cliente. Es opcional.</div></div>
     <div class="fld"><label>Servicio principal</label><select id="ci-s"><option>Asesoramiento integral</option><option>Sueldos + Impuestos</option><option>Contabilidad general</option><option>Monotributo</option><option>Balance + DDJJ</option></select></div>
@@ -1121,9 +1122,9 @@
   const ROL_LABEL = { admin:'Administrador', contador:'Contador', usuario:'Contador', cliente_pyme:'Cliente PyME', lectura:'Solo lectura' };
   const NAV_OCULTO = {
     admin: [],
-    contador: ['usuarios','ajustes'],
-    usuario: ['usuarios','ajustes'],
-    lectura: ['usuarios','ajustes','extractos'],
+    contador: ['usuarios','ajustes','reportes'],
+    usuario: ['usuarios','ajustes','reportes'],
+    lectura: ['usuarios','ajustes','extractos','reportes'],
     cliente_pyme: ['usuarios','ajustes','inicio','clientes','reportes','extractos']
   };
   function aplicarAlcanceRol(){
@@ -1138,6 +1139,7 @@
   function aplicarPermisosUI(){
     document.body.classList.toggle('no-edit', !PUEDE_EDITAR);
     document.body.classList.toggle('es-pyme', ES_PYME);
+    document.body.classList.toggle('no-hon', !ES_ADMIN);   // honorarios: solo el administrador
     (NAV_OCULTO[ROL]||NAV_OCULTO.contador).forEach(v=>{
       const el=document.querySelector(`.menu-i[data-v="${v}"]`); if(el) el.style.display='none';
     });
@@ -1256,7 +1258,7 @@
   // ── NAVEGACIÓN ──
   const titles = { inicio:['Panel general','Resumen del estudio'], clientes:['Clientes','Cartera del estudio'], agenda:['Agenda de vencimientos','Calendario impositivo y laboral'], docs:['Archivo digital','Documentos del estudio'], asistente:['Asistente','Consultas del estudio'], extractos:['Extractos bancarios','Lectura con IA · el contador revisa y confirma'], reportes:['Reportes','Métricas y análisis'], ajustes:['Configuración','Ajustes del sistema'], usuarios:['Usuarios del sistema','Accesos y roles'] };
   function nav(v){
-    if(!ES_ADMIN && (v==='usuarios'||v==='ajustes')) v = 'agenda';
+    if(!ES_ADMIN && (v==='usuarios'||v==='ajustes'||v==='reportes')) v = 'agenda';
     document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));
     $('v-'+v).classList.add('on');
     document.querySelectorAll('.menu-i').forEach(b=>b.classList.toggle('on', b.dataset.v===v));
@@ -1485,7 +1487,7 @@
       <td class="selc"><input type="checkbox" data-sel-cli="${c.id}" ${SEL_CLI.has(c.id)?'checked':''} aria-label="Seleccionar ${esc(c.nombre)}"></td>
       <td><div class="nm">${esc(c.nombre)}</div></td>
       <td><span class="mono">${esc(c.cuit||'—')}</span></td>
-      <td>${esc(c.servicio)}</td><td><strong>${money(c.honorarios)}</strong></td>
+      <td>${esc(c.servicio)}</td><td class="hon"><strong>${money(c.honorarios)}</strong></td>
       <td>${estChip(c.estado)}</td>
       <td style="max-width:14rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.email||'')}">${c.email?esc(c.email):'<span style="color:var(--ink-3)">—</span>'}</td>
       <td><div class="acts"><button class="ib" data-edit-cli="${c.id}">✎</button><button class="ib d" data-del-cli="${c.id}">×</button></div></td>
@@ -2219,7 +2221,7 @@ async function docSave(){
     const rc=DB.clientes.slice(-5).reverse();
     $('h-cli').innerHTML = rc.length ? rc.map(c=>`<div class="li"><div class="av">${esc(c.nombre.slice(0,2).toUpperCase())}</div>
       <div class="lm"><div class="t">${esc(c.nombre)}</div><div class="s">${esc(c.cuit||'sin CUIT')}</div></div>
-      <div class="lv"><div class="v">${money(c.honorarios)}</div><div class="x">${esc(c.servicio.split(' ')[0])}</div></div></div>`).join('') : `<div class="empty"><div class="e">▤</div>Sin clientes aún</div>`;
+      <div class="lv"><div class="v hon">${money(c.honorarios)}</div><div class="x">${esc(c.servicio.split(' ')[0])}</div></div></div>`).join('') : `<div class="empty"><div class="e">▤</div>Sin clientes aún</div>`;
   }
 
   // ── REPORTES ──

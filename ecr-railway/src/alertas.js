@@ -32,10 +32,13 @@ const fechaAR = iso => iso.split('-').reverse().join('/');
 
 const usaWebhook = () => !!(process.env.ALERTAS_WEBHOOK_URL && process.env.ALERTAS_WEBHOOK_SECRET);
 const usaGmail = () => !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+const pausadas = () => /^(1|true|si|sí|yes)$/i.test(String(process.env.ALERTAS_PAUSADAS || '').trim());
 function configurado() {
+  if (pausadas()) return false;   // pausa manual: ALERTAS_PAUSADAS=1 (se reactiva borrando la variable)
   return !!(process.env.ALERTAS_MAIL_PARA && (usaWebhook() || usaGmail() || process.env.RESEND_API_KEY));
 }
-const FALTA = 'Faltan variables en el servidor: ALERTAS_MAIL_PARA, ALERTAS_WEBHOOK_URL y ALERTAS_WEBHOOK_SECRET';
+const FALTA_TXT = 'Faltan variables en el servidor: ALERTAS_MAIL_PARA, ALERTAS_WEBHOOK_URL y ALERTAS_WEBHOOK_SECRET';
+const motivoNo = () => pausadas() ? 'Los avisos por mail están pausados por el administrador' : FALTA_TXT;
 
 async function enviarMail({ asunto, html, texto }) {
   const para = process.env.ALERTAS_MAIL_PARA.split(/[,;\s]+/).filter(Boolean);
@@ -99,7 +102,7 @@ function armarMail(filas, fechaVence) {
 
 // Busca los vencimientos que vencen dentro de 7 días y todavía no se avisaron; manda UN mail con todos.
 async function enviarAlertas(db) {
-  if (!configurado()) return { enviado: false, motivo: FALTA };
+  if (!configurado()) return { enviado: false, motivo: motivoNo() };
   const objetivo = sumarDias(ahoraAR().fecha, DIAS_AVISO);
   const [filas] = await db.query(
     `SELECT v.id, v.descripcion, v.tipo, c.nombre AS cliente_nombre
@@ -115,7 +118,7 @@ async function enviarAlertas(db) {
 }
 
 async function enviarPrueba() {
-  if (!configurado()) return { enviado: false, motivo: FALTA };
+  if (!configurado()) return { enviado: false, motivo: motivoNo() };
   await enviarMail({
     asunto: 'Prueba de alertas · Sistema ECR',
     texto: 'Este es un mail de prueba. Si lo recibiste, las alertas de vencimientos están bien configuradas.',
@@ -133,7 +136,7 @@ async function tarea(db) {
 }
 
 function iniciar(db) {
-  if (!configurado()) console.log('Alertas por mail: desactivadas (' + FALTA + ')');
+  if (!configurado()) console.log('Alertas por mail: desactivadas (' + motivoNo() + ')');
   setTimeout(() => tarea(db), 60 * 1000);
   setInterval(() => tarea(db), 30 * 60 * 1000);
 }

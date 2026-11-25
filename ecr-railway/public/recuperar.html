@@ -73,7 +73,7 @@
   }
   .ok {
     background: var(--green-soft); color: var(--green); padding: 1rem; border-radius: 6px;
-    font-size: 0.9rem; margin-bottom: 1.2rem; display: none; text-align: center;
+    font-size: 0.9rem; margin-bottom: 1.2rem; display: none; text-align: left; line-height: 1.55;
     border-left: 3px solid var(--green);
   }
   .ok strong {
@@ -129,20 +129,17 @@
   <div class="right">
     <div class="form-wrap">
       <h2>Recuperar contraseña</h2>
-      <p class="lead">Ingresá tu email y te generamos una contraseña temporal.</p>
+      <p class="lead">Ingresá tu email y te mandamos un enlace para elegir una contraseña nueva.</p>
 
       <div class="error" id="error"></div>
-      <div class="ok" id="ok">
-        Tu contraseña nueva es:
-        <strong id="nuevaPass"></strong>
-      </div>
+      <div class="ok" id="ok"></div>
 
       <form id="recuperarForm">
         <div class="fld">
           <label for="email">Email</label>
           <input type="email" id="email" placeholder="tu@estudio.com" required>
         </div>
-        <button type="submit">Generar contraseña nueva</button>
+        <button type="submit" id="btn">Enviar enlace</button>
       </form>
 
       <a class="volver" href="/login.html">← Volver a iniciar sesión</a>
@@ -155,13 +152,14 @@
   const form = document.getElementById('recuperarForm');
   const errorBox = document.getElementById('error');
   const okBox = document.getElementById('ok');
-  const nuevaPassEl = document.getElementById('nuevaPass');
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     errorBox.style.display = 'none';
     okBox.style.display = 'none';
     const email = document.getElementById('email').value;
+    const btn = document.getElementById('btn');
+    btn.disabled = true; btn.textContent = 'Enviando…';
     try {
       const res = await fetch('/api/recuperar', {
         method: 'POST',
@@ -170,17 +168,17 @@
       });
       const data = await res.json();
       if (!res.ok) {
-        errorBox.textContent = data.error || 'No se pudo generar la contraseña';
+        errorBox.textContent = data.error || 'No se pudo enviar el enlace';
         errorBox.style.display = 'block';
         return;
       }
-      nuevaPassEl.textContent = data.nuevaPass;
+      okBox.textContent = data.mensaje;
       okBox.style.display = 'block';
       form.style.display = 'none';
     } catch (err) {
       errorBox.textContent = 'Error de conexión con el servidor';
       errorBox.style.display = 'block';
-    }
+    } finally { btn.disabled = false; btn.textContent = 'Enviar enlace'; }
   });
 </script>
 </body>

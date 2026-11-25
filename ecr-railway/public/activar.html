@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activar cuenta · ECR</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #16161a;
+    --navy-2: #232329;
+    --gold: #b08d3c;
+    --gold-2: #c9a24a;
+    --gold-soft: #f3ecd9;
+    --bg: #f3f1ec;
+    --bg-soft: #faf9f6;
+    --line: #e2ddd2;
+    --ink: #1a1f2b;
+    --ink-2: #4a5161;
+    --muted: #8a8576;
+    --red: #9c3a3a;
+    --red-soft: #f3e3e3;
+    --green: #3a6b4f;
+    --green-soft: #e6efe8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif; min-height: 100vh; display: flex;
+    background: var(--bg); color: var(--ink); font-size: 14px;
+  }
+  h1, h2, h3 { font-family: 'Lora', serif; }
+  .side {
+    flex: 1.1; background: var(--navy); color: #fff; display: flex; flex-direction: column;
+    justify-content: space-between; padding: 3rem 3.2rem; position: relative; overflow: hidden;
+    min-height: 100vh;
+  }
+  .side::before {
+    content: ''; position: absolute; inset: 0;
+    background-image: radial-gradient(circle at 15% 20%, rgba(176,141,60,.14), transparent 40%),
+                       radial-gradient(circle at 85% 85%, rgba(176,141,60,.10), transparent 45%);
+    pointer-events: none;
+  }
+  .side-top, .side-bottom { position: relative; z-index: 1; }
+  .crest {
+    width: 58px; height: 58px; border: 1.5px solid var(--gold); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Lora', serif; font-weight: 700; font-size: 1.7rem; color: var(--gold);
+    margin-bottom: 1.6rem;
+  }
+  .side-top h1 { font-size: 1.9rem; font-weight: 600; line-height: 1.25; margin-bottom: 0.6rem; }
+  .side-top .sub {
+    font-size: 0.76rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-2);
+    font-weight: 600; margin-bottom: 2.5rem;
+  }
+  .quote {
+    font-family: 'Lora', serif; font-style: italic; font-size: 1.05rem; line-height: 1.65;
+    color: #c3cbd9; max-width: 380px; border-left: 2px solid var(--gold); padding-left: 1.2rem;
+  }
+  .side-bottom { display: flex; align-items: center; gap: 0.9rem; padding-top: 2rem; border-top: 1px solid rgba(255,255,255,.1); }
+  .side-bottom .yrs {
+    font-family: 'Lora', serif; font-weight: 700; font-size: 1.6rem; color: var(--gold);
+    line-height: 1;
+  }
+  .side-bottom .txt { font-size: 0.76rem; color: #9aa4b8; line-height: 1.4; }
+  .side-bottom .txt strong { display: block; color: #fff; font-size: 0.85rem; margin-bottom: 0.1rem; }
+  .right { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+  .form-wrap { width: 100%; max-width: 360px; }
+  .form-wrap h2 { font-size: 1.5rem; font-weight: 600; color: var(--ink); margin-bottom: 0.35rem; }
+  .form-wrap .lead { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
+  .error {
+    background: var(--red-soft); color: var(--red); padding: 0.7rem 0.9rem; border-radius: 6px;
+    font-size: 0.83rem; margin-bottom: 1.2rem; display: none; border-left: 3px solid var(--red);
+  }
+  .ok {
+    background: var(--green-soft); color: var(--green); padding: 1rem; border-radius: 6px;
+    font-size: 0.9rem; margin-bottom: 1.2rem; display: none; text-align: left; line-height: 1.55;
+    border-left: 3px solid var(--green);
+  }
+  .ok strong {
+    display: block; font-family: 'Lora', serif; font-size: 1.3rem; margin-top: 0.5rem;
+    letter-spacing: 1px; color: var(--ink);
+  }
+  label { display: block; font-size: 0.76rem; font-weight: 600; color: var(--ink-2); margin-bottom: 0.4rem; letter-spacing: 0.02em; }
+  .fld { margin-bottom: 1.2rem; }
+  input {
+    width: 100%; padding: 0.75rem 0.9rem; background: var(--bg-soft); border: 1px solid var(--line);
+    border-radius: 6px; font-family: 'Inter'; font-size: 0.92rem; color: var(--ink); transition: border-color .15s;
+  }
+  input:focus { outline: none; border-color: var(--gold); background: #fff; }
+  input::placeholder { color: #b5b0a2; }
+  button[type="submit"] {
+    width: 100%; padding: 0.8rem; background: var(--gold); color: #fff; border: none;
+    border-radius: 6px; font-family: 'Inter'; font-weight: 600; font-size: 0.92rem; cursor: pointer;
+    transition: background .15s; margin-top: 0.4rem;
+  }
+  button[type="submit"]:hover { background: var(--gold-2); }
+  a.volver {
+    display: block; text-align: center; margin-top: 1.4rem; font-size: 0.82rem;
+    color: var(--muted); text-decoration: none;
+  }
+  a.volver:hover { color: var(--gold); text-decoration: underline; }
+  .foot-note {
+    margin-top: 2.5rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+    font-size: 0.72rem; color: var(--muted); text-align: center; line-height: 1.5;
+  }
+  @media (max-width: 860px) {
+    body { flex-direction: column; }
+    .side { min-height: auto; padding: 2.2rem 1.8rem; }
+    .quote { display: none; }
+    .side-bottom { display: none; }
+    .right { padding: 2.2rem 1.6rem; }
+  }
+  .reglas { font-size: 0.76rem; color: var(--muted); margin: -0.6rem 0 1.2rem; line-height: 1.5; }
+  .reglas .si { color: var(--green); font-weight: 600; }
+  .pw { position: relative; }
+  .pw button { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.78rem; font-family: 'Inter'; }
+  a.ir { display: block; text-align: center; padding: 0.8rem; background: var(--gold); color: #fff; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 0.4rem; }
+</style>
+</head>
+<body>
+
+  <div class="side">
+    <div class="side-top">
+      <img src="/logo-oscuro.png" alt="ECR · Estudio Casil Rodríguez · 50 años" style="width:100%;max-width:300px;height:auto;display:block;margin-bottom:0.6rem">
+      <div class="sub">Sistema de gestión contable</div>
+      <p class="quote">"La confianza se construye con transparencia, y la transparencia con buenos números."</p>
+    </div>
+    <div class="side-bottom">
+      <div class="yrs">50</div>
+      <div class="txt"><strong>Años de trayectoria</strong>San Martín, Buenos Aires</div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="form-wrap">
+      <h2 id="titulo">Elegí tu contraseña</h2>
+      <p class="lead" id="lead">Verificando el enlace…</p>
+
+      <div class="error" id="error"></div>
+      <div class="ok" id="ok"></div>
+
+      <form id="form" style="display:none">
+        <div class="fld">
+          <label for="p1">Contraseña nueva</label>
+          <div class="pw"><input type="password" id="p1" autocomplete="new-password" required><button type="button" data-ver="p1">Mostrar</button></div>
+        </div>
+        <p class="reglas" id="reglas">Al menos <span id="r1">8 caracteres</span>, combinando <span id="r2">letras y números</span>.</p>
+        <div class="fld">
+          <label for="p2">Repetila</label>
+          <div class="pw"><input type="password" id="p2" autocomplete="new-password" required><button type="button" data-ver="p2">Mostrar</button></div>
+        </div>
+        <button type="submit" id="btn">Guardar contraseña</button>
+      </form>
+      <a class="ir" id="ir" href="/login.html" style="display:none">Ir a iniciar sesión</a>
+
+      <a class="volver" href="/recuperar.html" id="pedir" style="display:none">Pedir un enlace nuevo</a>
+      <a class="volver" href="/login.html">← Volver a iniciar sesión</a>
+
+      <div class="foot-note">Acceso exclusivo para personal autorizado del estudio y sus clientes.</div>
+    </div>
+  </div>
+
+<script>
+  // El código viene después de "#" en el enlace del mail; se quita de la barra de direcciones enseguida.
+  const token = new URLSearchParams(location.hash.slice(1)).get('t') || new URLSearchParams(location.search).get('t') || '';
+  try { history.replaceState(null, '', location.pathname); } catch (e) {}
+  const $ = id => document.getElementById(id);
+  const error = msg => { $('error').textContent = msg; $('error').style.display = 'block'; };
+  const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(async r => ({ ok: r.ok, data: await r.json().catch(() => ({})) }));
+
+  document.querySelectorAll('[data-ver]').forEach(b => b.addEventListener('click', () => {
+    const i = $(b.dataset.ver); const ver = i.type === 'password'; i.type = ver ? 'text' : 'password'; b.textContent = ver ? 'Ocultar' : 'Mostrar';
+  }));
+  $('p1').addEventListener('input', () => {
+    const v = $('p1').value;
+    $('r1').className = v.length >= 8 ? 'si' : '';
+    $('r2').className = (/[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(v) && /\d/.test(v)) ? 'si' : '';
+  });
+
+  (async () => {
+    if (!token) { $('lead').textContent = ''; error('Falta el código del enlace. Abrí el enlace completo desde el mail.'); $('pedir').style.display = 'block'; return; }
+    try {
+      const r = await post('/api/activar/info', { token });
+      if (!r.ok) { $('lead').textContent = ''; error(r.data.error || 'El enlace no es válido.'); $('pedir').style.display = 'block'; return; }
+      const activar = r.data.tipo === 'activacion';
+      $('titulo').textContent = activar ? 'Activá tu cuenta' : 'Elegí una contraseña nueva';
+      $('lead').textContent = `Hola ${r.data.nombre}. ${activar ? 'Elegí la contraseña con la que vas a ingresar' : 'Elegí tu nueva contraseña para ingresar'} con ${r.data.email}.`;
+      $('form').style.display = 'block';
+      $('p1').focus();
+    } catch (e) { $('lead').textContent = ''; error('Error de conexión con el servidor'); }
+  })();
+
+  $('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    $('error').style.display = 'none';
+    const p1 = $('p1').value, p2 = $('p2').value;
+    if (p1 !== p2) return error('Las dos contraseñas no coinciden.');
+    if (p1.length < 8 || !/[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(p1) || !/\d/.test(p1)) return error('La contraseña debe tener al menos 8 caracteres y combinar letras y números.');
+    $('btn').disabled = true; $('btn').textContent = 'Guardando…';
+    try {
+      const r = await post('/api/activar', { token, password: p1 });
+      if (!r.ok) { error(r.data.error || 'No se pudo guardar la contraseña'); $('btn').disabled = false; $('btn').textContent = 'Guardar contraseña'; return; }
+      $('form').style.display = 'none';
+      $('lead').textContent = '';
+      $('ok').textContent = '✔ Listo. Tu contraseña quedó guardada; ya podés ingresar con tu correo y la contraseña nueva.';
+      $('ok').style.display = 'block';
+      $('ir').style.display = 'block';
+    } catch (err) { error('Error de conexión con el servidor'); $('btn').disabled = false; $('btn').textContent = 'Guardar contraseña'; }
+  });
+</script>
+</body>
+</html>

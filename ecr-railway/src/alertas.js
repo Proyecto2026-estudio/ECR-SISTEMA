@@ -40,8 +40,15 @@ function configurado() {
 const FALTA_TXT = 'Faltan variables en el servidor: ALERTAS_MAIL_PARA, ALERTAS_WEBHOOK_URL y ALERTAS_WEBHOOK_SECRET';
 const motivoNo = () => pausadas() ? 'Los avisos por mail están pausados por el administrador' : FALTA_TXT;
 
-async function enviarMail({ asunto, html, texto }) {
-  const para = process.env.ALERTAS_MAIL_PARA.split(/[,;\s]+/).filter(Boolean);
+// Hay una forma de mandar mails configurada (sin importar la pausa de las alertas).
+// La usan también los mails de activación de cuenta y de cambio de contraseña.
+const mailDisponible = () => usaWebhook() || usaGmail() || !!process.env.RESEND_API_KEY;
+
+// `destino`: a quién se manda; si no se indica, va al mail del estudio (ALERTAS_MAIL_PARA).
+async function enviarMail({ asunto, html, texto, destino }) {
+  const para = String(destino || process.env.ALERTAS_MAIL_PARA || '').split(/[,;\s]+/).filter(Boolean);
+  if (!para.length) throw new Error('No hay destinatario para el mail');
+  if (!mailDisponible()) throw new Error('No hay un servicio de mail configurado en el servidor');
   if (usaWebhook()) {
     const r = await fetch(process.env.ALERTAS_WEBHOOK_URL, {
       method: 'POST', redirect: 'follow',
@@ -141,4 +148,4 @@ function iniciar(db) {
   setInterval(() => tarea(db), 30 * 60 * 1000);
 }
 
-module.exports = { iniciar, enviarAlertas, enviarPrueba, armarMail, sumarDias, DIAS_AVISO };
+module.exports = { iniciar, enviarAlertas, enviarPrueba, armarMail, sumarDias, DIAS_AVISO, enviarMail, mailDisponible, esc };

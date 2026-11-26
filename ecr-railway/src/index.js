@@ -112,11 +112,18 @@ const migraciones = (async () => {
   await crearTabla('carpetas', `CREATE TABLE IF NOT EXISTS carpetas (
       id INT AUTO_INCREMENT PRIMARY KEY,
       cliente_id INT NOT NULL,
+      padre_id INT NULL,
       nombre VARCHAR(60) NOT NULL,
       creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE KEY uq_carpeta (cliente_id, nombre)
+      KEY idx_carpeta_cliente (cliente_id)
     )`);
   await agregarColumna('documentos', 'carpeta_id INT NULL');
+  // Carpetas dentro de carpetas (por ejemplo, Banco Galicia › 2025). padre_id NULL = está en la carpeta principal del cliente.
+  await agregarColumna('carpetas', 'padre_id INT NULL');
+  // El nombre ya no es único en todo el cliente sino dentro de cada carpeta (puede haber "2025" en dos bancos).
+  try { await db.query('ALTER TABLE carpetas ADD KEY idx_carpeta_cliente (cliente_id)'); } catch (e) { /* ya existe */ }
+  try { await db.query('ALTER TABLE carpetas DROP INDEX uq_carpeta'); console.log('Migración: carpetas.uq_carpeta quitada (nombres únicos por carpeta)'); }
+  catch (e) { if (e.code !== 'ER_CANT_DROP_FIELD_OR_KEY') console.error('Migración carpetas.uq_carpeta:', e.message); }
   // Registro de avisos por mail ya enviados (para no repetir el mismo vencimiento)
   await crearTabla('alertas_enviadas', `CREATE TABLE IF NOT EXISTS alertas_enviadas (
       venc_id INT NOT NULL,
@@ -721,6 +728,17 @@ async function permisoCarpetas(req, res) {
   if (u.rol === 'cliente_pyme' && !u.cliente_id) { res.status(403).json({ error: 'Tu usuario no tiene un cliente asociado' }); return null; }
   return u;
 }
+const MAX_NIVELES = 5;
+// Ruta de nombres desde la carpeta principal hasta esta (["Banco Galicia", "2025"]).
+async function rutaCarpeta(id) {
+  const ruta = []; let actual = id;
+  for (let i = 0; actual && i < 20; i++) {
+    const [r] = await db.query('SELECT padre_id, nombre FROM carpetas WHERE id = ?', [actual]);
+    if (!r.length) break;
+    ruta.unshift(r[0].nombre); actual = r[0].padre_id;
+  }
+  return ruta;
+}
 const nombreCarpeta = v => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, 60);
 
 app.get('/api/carpetas', requireAuth, async (req, res) => {
@@ -730,7 +748,7 @@ app.get('/api/carpetas', requireAuth, async (req, res) => {
     if (u.rol === 'cliente_pyme' && !u.cliente_id) return res.json([]);
     const soloMio = u.rol === 'cliente_pyme';
     const [rows] = await db.query(
-      `SELECT id, cliente_id, nombre FROM carpetas ${soloMio ? 'WHERE cliente_id = ?' : ''} ORDER BY nombre ASC`,
+      `SELECT id, cliente_id, padre_id, nombre FROM carpetas ${soloMio ? 'WHERE cliente_id = ?' : ''} ORDER BY nombre ASC`,
       soloMio ? [u.cliente_id] : []);
     res.json(rows);
   } catch (e) { res.status(500).json({ error: 'Error de base de datos' }); }
@@ -743,37 +761,60 @@ app.post('/api/carpetas', requireAuth, async (req, res) => {
     if (!nombre) return res.status(400).json({ error: 'Escribí un nombre para la carpeta' });
     const clienteId = u.rol === 'cliente_pyme' ? u.cliente_id : req.body.cliente_id;
     if (!clienteId) return res.status(400).json({ error: 'Falta el cliente' });
-    const [dup] = await db.query('SELECT id FROM carpetas WHERE cliente_id = ? AND nombre = ?', [clienteId, nombre]);
-    if (dup.length) return res.status(409).json({ error: 'Ya existe una carpeta con ese nombre' });
-    const [r] = await db.query('INSERT INTO carpetas (cliente_id, nombre) VALUES (?, ?)', [clienteId, nombre]);
-    res.status(201).json({ ok: true, id: r.insertId, nombre });
+    // Carpeta "padre": tiene que ser del mismo cliente. Se permiten hasta MAX_NIVELES niveles.
+    const padreId = req.body.padre_id ? Number(req.body.padre_id) : null;
+    if (padreId) {
+      const [pd] = await db.query('SELECT id FROM carpetas WHERE id = ? AND cliente_id = ?', [padreId, clienteId]);
+      if (!pd.length) return res.status(400).json({ error: 'La carpeta donde querés crearla no es de este cliente' });
+      if ((await rutaCarpeta(padreId)).length >= MAX_NIVELES) return res.status(400).json({ error: `Se pueden anidar hasta ${MAX_NIVELES} niveles de carpetas` });
+    }
+    const [dup] = await db.query('SELECT id FROM carpetas WHERE cliente_id = ? AND padre_id <=> ? AND nombre = ?', [clienteId, padreId, nombre]);
+    if (dup.length) return res.status(409).json({ error: 'Ya existe una carpeta con ese nombre en este lugar' });
+    const [r] = await db.query('INSERT INTO carpetas (cliente_id, padre_id, nombre) VALUES (?, ?, ?)', [clienteId, padreId, nombre]);
+    registrar(db, req, 'carpeta_alta', (await rutaCarpeta(r.insertId)).join(' › '), u.id);
+    res.status(201).json({ ok: true, id: r.insertId, nombre, padre_id: padreId });
   } catch (e) { res.status(500).json({ error: 'Error al crear la carpeta' }); }
 });
 
 app.put('/api/carpetas/:id', requireAuth, async (req, res) => {
   try {
     const u = await permisoCarpetas(req, res); if (!u) return;
-    const [c] = await db.query('SELECT id, cliente_id FROM carpetas WHERE id = ?', [req.params.id]);
+    const [c] = await db.query('SELECT id, cliente_id, padre_id FROM carpetas WHERE id = ?', [req.params.id]);
     if (!c.length) return res.status(404).json({ error: 'No existe la carpeta' });
     if (u.rol === 'cliente_pyme' && String(c[0].cliente_id) !== String(u.cliente_id)) return res.status(403).json({ error: 'No tenés acceso a esta carpeta' });
     const nombre = nombreCarpeta(req.body.nombre);
     if (!nombre) return res.status(400).json({ error: 'Escribí un nombre para la carpeta' });
-    const [dup] = await db.query('SELECT id FROM carpetas WHERE cliente_id = ? AND nombre = ? AND id <> ?', [c[0].cliente_id, nombre, c[0].id]);
-    if (dup.length) return res.status(409).json({ error: 'Ya existe una carpeta con ese nombre' });
+    const [dup] = await db.query('SELECT id FROM carpetas WHERE cliente_id = ? AND padre_id <=> ? AND nombre = ? AND id <> ?', [c[0].cliente_id, c[0].padre_id, nombre, c[0].id]);
+    if (dup.length) return res.status(409).json({ error: 'Ya existe una carpeta con ese nombre en este lugar' });
     await db.query('UPDATE carpetas SET nombre = ? WHERE id = ?', [nombre, c[0].id]);
     res.json({ ok: true, nombre });
   } catch (e) { res.status(500).json({ error: 'Error al renombrar la carpeta' }); }
 });
 
-// Borrar una carpeta NO borra sus documentos: vuelven a la carpeta principal del cliente.
+// Borrar una carpeta NO borra nada de lo que tiene adentro: sus documentos y sus carpetas
+// pasan a la carpeta de arriba (o a la principal del cliente).
 app.delete('/api/carpetas/:id', requireAuth, async (req, res) => {
   try {
     const u = await permisoCarpetas(req, res); if (!u) return;
-    const [c] = await db.query('SELECT id, cliente_id FROM carpetas WHERE id = ?', [req.params.id]);
+    const [c] = await db.query('SELECT id, cliente_id, padre_id FROM carpetas WHERE id = ?', [req.params.id]);
     if (!c.length) return res.status(404).json({ error: 'No existe la carpeta' });
     if (u.rol === 'cliente_pyme' && String(c[0].cliente_id) !== String(u.cliente_id)) return res.status(403).json({ error: 'No tenés acceso a esta carpeta' });
-    await db.query('UPDATE documentos SET carpeta_id = NULL WHERE carpeta_id = ?', [c[0].id]);
+    const ruta = (await rutaCarpeta(c[0].id)).join(' › ');
+    const arriba = c[0].padre_id || null;
+    await db.query('UPDATE documentos SET carpeta_id = ? WHERE carpeta_id = ?', [arriba, c[0].id]);
+    // Las carpetas de adentro suben un nivel; si ya hay una con el mismo nombre allá, se les agrega " (2)", " (3)"…
+    const [hijas] = await db.query('SELECT id, nombre FROM carpetas WHERE padre_id = ?', [c[0].id]);
+    for (const h of hijas) {
+      let nombre = h.nombre;
+      for (let n = 2; ; n++) {
+        const [dup] = await db.query('SELECT id FROM carpetas WHERE cliente_id = ? AND padre_id <=> ? AND nombre = ? AND id <> ?', [c[0].cliente_id, arriba, nombre, h.id]);
+        if (!dup.length) break;
+        const suf = ` (${n})`; nombre = h.nombre.slice(0, 60 - suf.length) + suf;
+      }
+      await db.query('UPDATE carpetas SET padre_id = ?, nombre = ? WHERE id = ?', [arriba, nombre, h.id]);
+    }
     await db.query('DELETE FROM carpetas WHERE id = ?', [c[0].id]);
+    registrar(db, req, 'carpeta_baja', ruta + ' (su contenido pasó a la carpeta de arriba)', u.id);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: 'Error al eliminar la carpeta' }); }
 });

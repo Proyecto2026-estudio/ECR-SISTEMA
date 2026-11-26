@@ -529,6 +529,9 @@
   .carp-bar { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 0 0 1rem; }
   .doc.subf .di { font-size: 2.2rem; }
   .doc .en-carp { font-size: 0.76rem; color: var(--gold); font-weight: 600; }
+  #doc-cli-t a { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--muted); }
+  #doc-cli-t a:hover { color: var(--gold); border-color: var(--gold); }
+  #doc-cli-t .sep { margin: 0 0.45rem; color: var(--muted); font-weight: 400; }
   #ex-drop { padding: 2rem 1rem; }
   .ex-chosen { display: flex; align-items: center; gap: 0.8rem; margin-top: 0.9rem; padding: 0.7rem 0.9rem; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
   .ex-chosen .ex-ic { font-size: 1.6rem; }
@@ -1135,7 +1138,7 @@
   <div class="mh"><h3 id="carp-t">Nueva carpeta</h3><button class="x" data-close="m-carp">×</button></div>
   <div class="mb">
     <div class="fld"><label>Nombre de la carpeta</label><input id="carp-n" maxlength="60" placeholder="Banco Galicia" autocomplete="off"></div>
-    <div style="font-size:0.82rem;color:var(--ink-2)">Sirve para ordenar tus documentos, por ejemplo una carpeta por cada banco.</div>
+    <div style="font-size:0.82rem;color:var(--ink-2)" id="carp-ayuda">Sirve para ordenar tus documentos, por ejemplo una carpeta por cada banco y, adentro, una por año.</div>
   </div>
   <div class="mf"><button class="btn btn-soft" data-close="m-carp">Cancelar</button><button class="btn btn-pri" id="carp-ok">Guardar</button></div>
 </div></div>
@@ -1265,7 +1268,7 @@
         api('/api/clientes'), api('/api/vencimientos'), api('/api/documentos'),
         api('/api/carpetas').catch(()=>[])
       ]);
-      DB.carpetas = (carp||[]).map(c=>({ id:String(c.id), cli:String(c.cliente_id), nombre:c.nombre }));
+      DB.carpetas = (carp||[]).map(c=>({ id:String(c.id), cli:String(c.cliente_id), padre:c.padre_id?String(c.padre_id):'', nombre:c.nombre }));
       DB.clientes = cli.map(c=>({ id:String(c.id), nombre:c.nombre, cuit:c.cuit, email:c.email_alertas||'', honorarios:c.honorarios, servicio:c.servicio, estado:c.estado }));
       DB.venc = ven.map(v=>({ id:String(v.id), desc:v.descripcion, cli:v.cliente_id?String(v.cliente_id):'', tipo:v.tipo, fecha:(v.fecha||'').slice(0,10), estado:v.estado, entrega:(v.fecha_entrega||'').slice(0,10) }));
       DB.docs = doc.map(d=>({ id:String(d.id), nombre:d.nombre, tipo:d.tipo, cli:d.cliente_id?String(d.cliente_id):'', carp:d.carpeta_id?String(d.carpeta_id):'', fecha:(d.fecha||'').slice(0,10), periodo:d.periodo||(d.fecha||'').slice(0,7), archivo_mime:d.archivo_mime||null, recibido:!!d.recibido_en, recibido_en:d.recibido_en||'', recibido_por:d.recibido_por_nombre||'', subido_por:d.subido_por_nombre||'', del_cliente:!!d.subido_por_cliente }));
@@ -2193,7 +2196,10 @@
   function carpModal(editar){
     CARP_EDIT = editar || null;
     const c = editar ? DB.carpetas.find(x=>x.id===editar) : null;
-    $('carp-t').textContent = c ? 'Renombrar carpeta' : 'Nueva carpeta';
+    const dentro = !c && DOC_SUB ? carpPorId(DOC_SUB) : null;
+    $('carp-t').textContent = c ? 'Renombrar carpeta' : (dentro ? 'Nueva carpeta dentro de “'+dentro.nombre+'”' : 'Nueva carpeta');
+    $('carp-n').placeholder = dentro ? String(new Date().getFullYear()) : 'Banco Galicia';
+    $('carp-ayuda').textContent = dentro ? 'Se crea adentro de '+rutaTxt(dentro.id)+'. Por ejemplo, una carpeta por año.' : 'Sirve para ordenar tus documentos, por ejemplo una carpeta por cada banco y, adentro, una por año.';
     $('carp-n').value = c ? c.nombre : ''; openM('m-carp'); setTimeout(()=>$('carp-n').focus(),50);
   }
   async function carpGuardar(){
@@ -2201,20 +2207,22 @@
     if(!nombre){ toast('Escribí un nombre para la carpeta'); return; }
     try{
       if(CARP_EDIT){ await api(`/api/carpetas/${CARP_EDIT}`,'PUT',{ nombre }); }
-      else { const r = await api('/api/carpetas','POST',{ nombre, cliente_id: ES_PYME ? MI_CLIENTE_ID : DOC_CLI }); }
+      else { await api('/api/carpetas','POST',{ nombre, cliente_id: ES_PYME ? MI_CLIENTE_ID : DOC_CLI, padre_id: DOC_SUB || null }); }
       await loadAll(); closeM('m-carp'); renderAll(); toast(CARP_EDIT ? 'Carpeta renombrada ✓' : 'Carpeta creada ✓');
     }catch(e){ toast(e.message); }
   }
   async function carpBorrar(){
     const c = DB.carpetas.find(x=>x.id===DOC_SUB); if(!c) return;
-    if(!await confirmar({ titulo:'¿Eliminar la carpeta “'+c.nombre+'”?', mensaje:'Los documentos NO se borran: vuelven a la carpeta principal.', ok:'Sí, eliminar carpeta' })) return;
-    try{ await api(`/api/carpetas/${c.id}`,'DELETE'); DOC_SUB=null; await loadAll(); renderAll(); toast('Carpeta eliminada'); }
+    const arriba = c.padre ? '“'+(carpPorId(c.padre)||{}).nombre+'”' : 'la carpeta principal';
+    const hay = carpsDe(c.cli).some(x=>x.padre===c.id);
+    if(!await confirmar({ titulo:'¿Eliminar la carpeta “'+c.nombre+'”?', mensaje:'No se borra nada de lo que tiene adentro: sus documentos'+(hay?' y sus carpetas':'')+' pasan a '+arriba+'.', ok:'Sí, eliminar carpeta' })) return;
+    try{ await api(`/api/carpetas/${c.id}`,'DELETE'); DOC_SUB=c.padre||null; await loadAll(); renderAll(); toast('Carpeta eliminada'); }
     catch(e){ toast(e.message); }
   }
   function moverModal(id){
     const d = DB.docs.find(x=>x.id===id); if(!d) return;
     MOVER_DOC = id; $('mv-doc').textContent = '📄 ' + d.nombre;
-    $('mv-sel').innerHTML = `<option value="">📁 Carpeta principal</option>` + carpsDe(d.cli).map(c=>`<option value="${c.id}">📂 ${esc(c.nombre)}</option>`).join('');
+    $('mv-sel').innerHTML = opcionesCarpetas(d.cli);
     $('mv-sel').value = d.carp || ''; openM('m-mover');
   }
   async function moverGuardar(){
@@ -2226,7 +2234,7 @@
     const cli = (ES_PYME ? MI_CLIENTE_ID : $('dm-c').value) || '';
     const cs = cli ? carpsDe(cli) : [];
     $('dm-carp-wrap').style.display = cs.length ? '' : 'none';
-    $('dm-carp').innerHTML = `<option value="">📁 Carpeta principal</option>` + cs.map(c=>`<option value="${c.id}">📂 ${esc(c.nombre)}</option>`).join('');
+    $('dm-carp').innerHTML = opcionesCarpetas(cli);
     $('dm-carp').value = (DOC_SUB && cs.some(c=>c.id===DOC_SUB) && String(DOC_CLI)===String(cli)) ? DOC_SUB : '';
   }
   // Abrir un archivo: se pide al servidor con la sesión iniciada (ya no hay links abiertos).
@@ -2319,6 +2327,20 @@ async function docSave(){
   let DOC_SUB = null;   // null = carpeta principal del cliente; id = subcarpeta abierta
   const PUEDE_CARPETAS = !ES_LECTURA;
   const carpsDe = cli => (DB.carpetas||[]).filter(c=>c.cli===cli);
+  const MAX_NIVELES = 5;
+  const carpPorId = id => (DB.carpetas||[]).find(c=>c.id===id);
+  // Ruta desde la carpeta principal: [Banco Galicia, 2025]
+  function rutaCarp(id){ const r=[]; let c=carpPorId(id); for(let i=0;c&&i<20;i++){ r.unshift(c); c=carpPorId(c.padre); } return r; }
+  const rutaTxt = id => rutaCarp(id).map(c=>c.nombre).join(' › ');
+  // Todas las carpetas que están adentro de una (hijas, nietas…), incluida ella misma
+  function carpYDentro(id){ const ids=new Set([id]); let crece=true; while(crece){ crece=false; (DB.carpetas||[]).forEach(c=>{ if(c.padre && ids.has(c.padre) && !ids.has(c.id)){ ids.add(c.id); crece=true; } }); } return ids; }
+  // Opciones de <select> con todas las carpetas del cliente ordenadas como un árbol
+  function opcionesCarpetas(cli){
+    const cs=carpsDe(cli), out=[];
+    const bajar=(padre,nivel)=>cs.filter(c=>c.padre===padre).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es',{numeric:true})).forEach(c=>{ out.push(`<option value="${c.id}">${'\u00a0\u00a0\u00a0'.repeat(nivel)}📂 ${esc(c.nombre)}</option>`); bajar(c.id,nivel+1); });
+    bajar('',0);
+    return `<option value="">📁 Carpeta principal</option>` + out.join('');
+  }
   let DOC_CLI = null;   // null = lista de carpetas; '' = documentos generales; id = carpeta de ese cliente
   const DOC_F = { anio:'', mes:'', tipo:'', rec:'' };   // filtros dentro de la carpeta de un cliente
   const MES_NOM = m => MESES[(+m||1)-1];
@@ -2366,11 +2388,16 @@ async function docSave(){
     const carps = carpsDe(DOC_CLI);
     if(DOC_SUB!==null && !carps.some(c=>c.id===DOC_SUB)) DOC_SUB = null;
     const sub = DOC_SUB!==null ? carps.find(c=>c.id===DOC_SUB) : null;
-    $('doc-cli-t').textContent = '📁 ' + cliName(DOC_CLI) + (sub ? '  ›  ' + sub.nombre : '');
+    const ruta = sub ? rutaCarp(sub.id) : [];
+    // Título con la ruta; cada parte se puede tocar para volver a ese nivel
+    $('doc-cli-t').innerHTML = `<a href="#" data-ir-carp="">📁 ${esc(cliName(DOC_CLI))}</a>` + ruta.map((c,i)=>`<span class="sep">›</span>${i===ruta.length-1?`<span>📂 ${esc(c.nombre)}</span>`:`<a href="#" data-ir-carp="${c.id}">📂 ${esc(c.nombre)}</a>`}`).join('');
+    $('doc-cli-t').querySelectorAll('[data-ir-carp]').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault(); SEL_DOC.clear(); DOC_SUB=a.dataset.irCarp||null; $('doc-q').value=''; renderDocs(); }));
+    const padreSub = sub && sub.padre ? carpPorId(sub.padre) : null;
     $('doc-up').style.display = sub ? '' : 'none';
-    $('doc-up').textContent = ES_PYME ? '← Volver a mi carpeta' : '← ' + cliName(DOC_CLI);
+    $('doc-up').textContent = padreSub ? '← ' + padreSub.nombre : (ES_PYME ? '← Volver a mi carpeta' : '← ' + cliName(DOC_CLI));
     $('carp-bar').style.display = PUEDE_CARPETAS ? 'flex' : 'none';
-    $('carp-new').style.display = sub ? 'none' : '';
+    $('carp-new').style.display = ruta.length >= MAX_NIVELES ? 'none' : '';
+    $('carp-new').textContent = sub ? '＋ Carpeta dentro de “' + sub.nombre + '”' : '＋ Nueva carpeta';
     $('carp-ren').style.display = sub ? '' : 'none';
     $('carp-del').style.display = sub ? '' : 'none';
     const todos = (grupos.get(DOC_CLI)||[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)) || (+b.id)-(+a.id));
@@ -2395,13 +2422,16 @@ async function docSave(){
         && (!DOC_F.tipo || d.tipo===DOC_F.tipo) && (!DOC_F.rec || (DOC_F.rec==='pend' ? !d.recibido : d.recibido)));
     }
     lista.sort((a,b)=>String(b.periodo||'').localeCompare(String(a.periodo||'')) || String(b.fecha).localeCompare(String(a.fecha)) || (+b.id)-(+a.id));
-    let subs = (!sub && !filtrando) ? carps.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre)) : [];
-    if(q) subs = subs.filter(c=>norm(c.nombre).includes(q));
+    // Sin búsqueda: las carpetas que están en este nivel. Con búsqueda: cualquier carpeta del cliente cuyo nombre coincida.
+    let subs = filtrando ? [] : (q ? carps.filter(c=>norm(c.nombre).includes(q)) : carps.filter(c=>c.padre===(sub?sub.id:'')));
+    subs.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es',{numeric:true}));
     DOC_VISIBLES = lista.map(d=>d.id);
-    const cardsSub = subs.map(c=>{ const n=todos.filter(d=>d.carp===c.id).length;
-      return `<div class="doc folder subf" data-subf="${c.id}" tabindex="0" role="button" aria-label="Abrir la carpeta ${esc(c.nombre)}"><span class="cnt">${n}</span><div class="di">📂</div><div class="dt">${esc(c.nombre)}</div><div class="dm">${n} documento${n===1?'':'s'}</div></div>`; }).join('');
+    const cardsSub = subs.map(c=>{
+      const dentro=carpYDentro(c.id), n=todos.filter(d=>dentro.has(d.carp)).length, nc=carps.filter(x=>x.padre===c.id).length;
+      const donde = (q && c.padre) ? `<div class="en-carp">en ${esc(rutaTxt(c.padre))}</div>` : '';
+      return `<div class="doc folder subf" data-subf="${c.id}" tabindex="0" role="button" aria-label="Abrir la carpeta ${esc(c.nombre)}"><span class="cnt">${n}</span><div class="di">📂</div><div class="dt">${esc(c.nombre)}</div><div class="dm">${n} documento${n===1?'':'s'}${nc?` · ${nc} carpeta${nc===1?'':'s'}`:''}</div>${donde}</div>`; }).join('');
     if(!lista.length && !subs.length){
-      g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="e">▭</div>${(q||filtrando)?'Ningún documento coincide con la búsqueda o los filtros.':(sub?'Esta carpeta está vacía. Cargá documentos con “Carga masiva” o movelos desde la carpeta principal.':'Todavía no hay documentos en esta carpeta.')}</div>`;
+      g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="e">▭</div>${(q||filtrando)?'Ningún documento coincide con la búsqueda o los filtros.':(sub?'Esta carpeta está vacía. Creá una carpeta adentro, cargá documentos con “Carga masiva” o movelos desde otra carpeta.':'Todavía no hay documentos en esta carpeta.')}</div>`;
       actualizarSelDoc(); return;
     }
     let perAnt = null;
@@ -2412,7 +2442,7 @@ async function docSave(){
       const editar = corr ? `<button type="button" class="btn btn-soft btn-sm" data-edit-doc="${d.id}">Corregir</button>` : '';
       const conf = (PUEDE_EDITAR && !d.recibido) ? `<button type="button" class="btn btn-pri btn-sm" data-rec-doc="${d.id}">✔ Confirmar recepción</button>` : '';
       const mover = (PUEDE_CARPETAS && carps.length && corr) ? `<button type="button" class="btn btn-soft btn-sm" data-mover-doc="${d.id}">Mover</button>` : '';
-      const dnde = ((q||filtrando) && d.carp) ? `<div class="en-carp">📂 ${esc((carps.find(c=>c.id===d.carp)||{}).nombre||'')}</div>` : '';
+      const dnde = ((q||filtrando) && d.carp) ? `<div class="en-carp">📂 ${esc(rutaTxt(d.carp))}</div>` : '';
       const estado = d.recibido
         ? `<span class="chip ok" title="${esc(d.recibido_en?'Confirmado el '+new Date(d.recibido_en.replace(' ','T')).toLocaleString('es-AR'):'')}"><span class="dt"></span>Recibido${d.recibido_por?' por '+esc(d.recibido_por.split(' ')[0]):''}</span>`
         : `<span class="chip warn"><span class="dt"></span>${ES_PYME?'Enviado · el estudio lo tiene que confirmar':'Por revisar'}</span>`;
@@ -2768,7 +2798,7 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
     recuperar_pedido:'Pidió cambiar la contraseña', enlace_enviado:'Envió un enlace', usuario_alta:'Creó un usuario', usuario_editado:'Editó un usuario', usuario_baja:'Eliminó un usuario',
     cliente_alta:'Creó un cliente', cliente_editado:'Editó un cliente', cliente_baja:'Eliminó un cliente', vencimiento_baja:'Eliminó un vencimiento',
     documento_subido:'Subió un documento', documento_abierto:'Abrió un documento', documento_editado:'Corrigió un documento', documento_borrado:'Eliminó un documento',
-    documento_recibido:'Confirmó la recepción', documento_pendiente:'Marcó un documento por revisar', acceso_denegado:'⚠ Acceso denegado',
+    documento_recibido:'Confirmó la recepción', carpeta_alta:'Creó una carpeta', carpeta_baja:'Eliminó una carpeta', documento_pendiente:'Marcó un documento por revisar', acceso_denegado:'⚠ Acceso denegado',
     extracto_leido:'Leyó un extracto', regla_alta:'Agregó una regla', regla_baja:'Borró una regla', equivalencias:'Guardó equivalencias',
     alerta_vista:'Vio la alerta de vencimientos', copia_descargada:'Descargó la copia de seguridad', copia_denegada:'⚠ Copia de seguridad denegada' };
   async function renderAuditoria(){
@@ -2853,7 +2883,7 @@ Respondé en español rioplatense, claro y al grano. Para temas que no son del e
   $('carp-ok').addEventListener('click',carpGuardar);
   $('carp-n').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); carpGuardar(); } });
   $('mv-ok').addEventListener('click',moverGuardar);
-  $('doc-up').addEventListener('click',()=>{ SEL_DOC.clear(); DOC_SUB=null; $('doc-q').value=''; renderDocs(); });
+  $('doc-up').addEventListener('click',()=>{ SEL_DOC.clear(); const c=carpPorId(DOC_SUB); DOC_SUB=(c&&c.padre)||null; $('doc-q').value=''; renderDocs(); });
   $('doc-back').addEventListener('click',()=>{ SEL_DOC.clear(); DOC_CLI=null; $('doc-q').value=''; renderDocs(); });
   $('ai-cli').addEventListener('change', updateAiCliInfo);
   $('docSave').addEventListener('click',docSave);

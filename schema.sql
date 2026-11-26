@@ -41,13 +41,15 @@ CREATE TABLE IF NOT EXISTS vencimientos (
   CONSTRAINT fk_venc_cliente FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL
 );
 
--- Subcarpetas dentro de la carpeta de un cliente (por ejemplo, una por banco)
+-- Subcarpetas dentro de la carpeta de un cliente (por ejemplo, una por banco y, adentro, una por año).
+-- padre_id NULL = está en la carpeta principal del cliente. El nombre no se repite dentro de una misma carpeta.
 CREATE TABLE IF NOT EXISTS carpetas (
   id          INT AUTO_INCREMENT PRIMARY KEY,
   cliente_id  INT NOT NULL,
+  padre_id    INT NULL,
   nombre      VARCHAR(60) NOT NULL,
   creado_en   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_carpeta (cliente_id, nombre)
+  KEY idx_carpeta_cliente (cliente_id)
 );
 
 CREATE TABLE IF NOT EXISTS documentos (
